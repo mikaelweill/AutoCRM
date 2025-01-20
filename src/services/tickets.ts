@@ -8,6 +8,27 @@ export interface CreateTicketData {
   attachments?: File[]
 }
 
+interface User {
+  email: string
+  full_name: string | null
+}
+
+export interface Ticket {
+  id: string
+  number: number
+  subject: string
+  description: string
+  status: 'new' | 'in_progress' | 'resolved' | 'closed'
+  priority: TicketPriority
+  client_id: string
+  agent_id: string | null
+  created_at: string
+  updated_at: string
+  resolved_at: string | null
+  client: User
+  agent: User | null
+}
+
 export async function createTicket(data: CreateTicketData) {
   console.log('Creating ticket with data:', data)
   
@@ -87,4 +108,24 @@ export async function createTicket(data: CreateTicketData) {
     console.error('Error creating ticket:', error)
     throw new Error('Failed to create ticket')
   }
+}
+
+export async function getTickets() {
+  const supabase = createClient()
+  
+  const { data: tickets, error } = await supabase
+    .from('tickets')
+    .select(`
+      *,
+      client:client_id(email, full_name),
+      agent:agent_id(email, full_name)
+    `)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching tickets:', error)
+    throw new Error('Failed to fetch tickets')
+  }
+
+  return tickets
 } 
