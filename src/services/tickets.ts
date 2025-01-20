@@ -118,6 +118,7 @@ export async function getTickets() {
       client:client_id(email, full_name),
       agent:agent_id(email, full_name)
     `)
+    .neq('status', 'cancelled')
     .order('created_at', { ascending: false })
 
   if (error) {
