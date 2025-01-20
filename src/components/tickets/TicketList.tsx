@@ -57,6 +57,18 @@ export function TicketList() {
           fetchTickets()
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'attachments'
+        },
+        (payload) => {
+          console.log('Attachment change detected:', payload)
+          fetchTickets()
+        }
+      )
 
     console.log('Setting up subscription...')
     channel.subscribe((status) => {
