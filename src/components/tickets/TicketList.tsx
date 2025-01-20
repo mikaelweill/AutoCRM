@@ -11,29 +11,61 @@ export function TicketList() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    const supabase = createClient()
+    
     // Initial fetch
     fetchTickets()
 
     // Set up real-time subscription
-    const supabase = createClient()
-    
     const channel = supabase
-      .channel('tickets')
+      .channel('public:tickets')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'tickets'
         },
-        async () => {
-          // Refetch tickets when any change occurs
-          await fetchTickets()
+        (payload) => {
+          console.log('INSERT event received:', payload)
+          fetchTickets()
         }
       )
-      .subscribe()
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'tickets'
+        },
+        (payload) => {
+          console.log('UPDATE event received:', payload)
+          fetchTickets()
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'tickets'
+        },
+        (payload) => {
+          console.log('DELETE event received:', payload)
+          fetchTickets()
+        }
+      )
+
+    console.log('Setting up subscription...')
+    channel.subscribe((status) => {
+      console.log('Subscription status:', status)
+      if (status === 'SUBSCRIBED') {
+        console.log('Successfully subscribed to tickets changes')
+      }
+    })
 
     return () => {
+      console.log('Cleaning up subscription')
       supabase.removeChannel(channel)
     }
   }, [])
