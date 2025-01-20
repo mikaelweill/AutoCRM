@@ -70,10 +70,10 @@ export async function createTicket(data: CreateTicketData) {
           .insert({
             ticket_id: ticket.id,
             user_id: user.id,
-            name: file.name,
-            path: path,
-            size: file.size,
-            type: file.type,
+            file_name: file.name,
+            file_type: file.type,
+            file_size: file.size,
+            storage_path: path,
           })
 
         if (attachmentError) {
