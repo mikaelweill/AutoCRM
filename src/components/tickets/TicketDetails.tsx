@@ -28,6 +28,17 @@ export function TicketDetails({ ticket, onClose }: TicketDetailsProps) {
 
   // Subscribe to new activities
   useEffect(() => {
+    // Fetch existing activities first
+    supabase
+      .from('ticket_activities')
+      .select('*, user:users(*)')
+      .eq('ticket_id', ticket.id)
+      .order('created_at', { ascending: true })
+      .then(({ data }) => {
+        if (data) setActivities(data as TicketActivity[])
+      })
+
+    // Then set up subscription
     const channel = supabase
       .channel(`ticket-${ticket.id}`)
       .on(
@@ -38,21 +49,20 @@ export function TicketDetails({ ticket, onClose }: TicketDetailsProps) {
           table: 'ticket_activities',
           filter: `ticket_id=eq.${ticket.id}`
         },
-        (payload) => {
-          setActivities(prev => [...prev, payload.new as TicketActivity])
+        async (payload) => {
+          // Fetch the complete activity with user data
+          const { data } = await supabase
+            .from('ticket_activities')
+            .select('*, user:users(*)')
+            .eq('id', payload.new.id)
+            .single()
+          
+          if (data) {
+            setActivities(prev => [...prev, data as TicketActivity])
+          }
         }
       )
       .subscribe()
-
-    // Fetch existing activities
-    supabase
-      .from('ticket_activities')
-      .select('*, user:users(*)')
-      .eq('ticket_id', ticket.id)
-      .order('created_at', { ascending: true })
-      .then(({ data }) => {
-        if (data) setActivities(data as TicketActivity[])
-      })
 
     return () => {
       supabase.removeChannel(channel)
