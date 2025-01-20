@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Ticket, getTickets, cancelTicket, getAttachmentUrl } from '@/services/tickets'
 import { TICKET_PRIORITIES, TICKET_STATUSES } from '@/config/tickets'
+import { Dialog } from '@/components/ui/Dialog'
+import { TicketDetails } from './TicketDetails'
 
 export function TicketList() {
   const [tickets, setTickets] = useState<Ticket[]>([])
@@ -11,6 +13,7 @@ export function TicketList() {
   const [error, setError] = useState<string | null>(null)
   const [isCancelling, setIsCancelling] = useState<string | null>(null)
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({})
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -152,7 +155,8 @@ export function TicketList() {
       {tickets.map((ticket) => (
         <div
           key={ticket.id}
-          className="bg-white shadow rounded-lg p-6 hover:shadow-md transition-shadow"
+          onClick={() => setSelectedTicket(ticket)}
+          className="bg-white shadow rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer"
         >
           <div className="flex items-start justify-between">
             <div>
@@ -204,7 +208,11 @@ export function TicketList() {
                         href={attachmentUrls[attachment.storage_path] || '#'}
                         onClick={async (e) => {
                           e.preventDefault()
-                          window.open(await handleGetAttachmentUrl(attachment.storage_path), '_blank')
+                          e.stopPropagation() // Prevent opening modal when clicking attachment
+                          window.open(
+                            await handleGetAttachmentUrl(attachment.storage_path),
+                            '_blank'
+                          )
                         }}
                         className="inline-flex items-center gap-1 px-2 py-1 text-sm text-blue-600 hover:text-blue-700 hover:underline bg-blue-50 rounded"
                       >
@@ -226,7 +234,10 @@ export function TicketList() {
               </span>
               {ticket.status !== 'cancelled' && (
                 <button
-                  onClick={() => handleCancelTicket(ticket.id)}
+                  onClick={(e) => {
+                    e.stopPropagation() // Prevent opening modal when clicking cancel
+                    handleCancelTicket(ticket.id)
+                  }}
                   disabled={isCancelling === ticket.id}
                   className="px-2 py-1 text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -237,6 +248,19 @@ export function TicketList() {
           </div>
         </div>
       ))}
+
+      <Dialog
+        isOpen={selectedTicket !== null}
+        onClose={() => setSelectedTicket(null)}
+        title="Ticket Details"
+      >
+        {selectedTicket && (
+          <TicketDetails
+            ticket={selectedTicket}
+            onClose={() => setSelectedTicket(null)}
+          />
+        )}
+      </Dialog>
     </div>
   )
 } 
