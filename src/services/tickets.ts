@@ -8,9 +8,15 @@ export interface CreateTicketData {
   attachments?: File[]
 }
 
-interface User {
+export interface User {
+  id: string
   email: string
   full_name: string | null
+  role: 'client' | 'agent' | 'admin'
+  created_at: string
+  updated_at: string
+  last_seen: string | null
+  metadata: Record<string, any>
 }
 
 interface Attachment {
@@ -38,6 +44,17 @@ export interface Ticket {
   client: User
   agent: User | null
   attachments?: Attachment[]
+}
+
+export interface TicketActivity {
+  id: string
+  ticket_id: string
+  user_id: string
+  activity_type: 'comment' | 'status_change' | 'priority_change' | 'agent_assignment' | 'attachment_added'
+  content: string
+  is_internal: boolean
+  created_at: string
+  user: Pick<User, 'id' | 'email' | 'full_name'>
 }
 
 export async function createTicket(data: CreateTicketData) {
@@ -217,4 +234,35 @@ export async function getAttachmentUrl(path: string) {
   const supabase = createClient()
   const { data } = await supabase.storage.from('attachments').getPublicUrl(path)
   return data.publicUrl
+}
+
+export async function addTicketReply(ticketId: string, content: string) {
+  const supabase = createClient()
+  
+  // Get the current user
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) {
+    console.error('Error getting user:', userError)
+    throw new Error('User must be logged in to add reply')
+  }
+
+  // Add the reply as a ticket activity
+  const { data, error } = await supabase
+    .from('ticket_activities')
+    .insert({
+      ticket_id: ticketId,
+      user_id: user.id,
+      activity_type: 'comment',
+      content,
+      is_internal: false
+    })
+    .select('*, user:users(*)')
+    .single()
+
+  if (error) {
+    console.error('Error adding reply:', error)
+    throw error
+  }
+
+  return data as TicketActivity
 } 

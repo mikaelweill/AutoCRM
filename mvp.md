@@ -1,6 +1,6 @@
 # AutoCRM MVP Specification
 
-## Progress Update
+## Progress Update (Last Updated: Jan 20)
 ✅ = Completed
 🚧 = In Progress
 ⏳ = Not Started
@@ -18,9 +18,11 @@
      ✅ Optional: attach files
    ✅ View own tickets
      ✅ List of all tickets with status
+     ✅ View full ticket details in modal
      🚧 Sort by date, status, priority
-   🚧 View ticket details
-     ⏳ See ticket history and updates
+   ✅ Ticket Actions
+     ✅ Cancel tickets
+     ✅ View attachments
      ⏳ Add comments/replies
      ⏳ View agent responses
 
@@ -43,41 +45,31 @@
 ⏳ ticket_activities
 ✅ attachments
 
-## 3. Key Design Decisions
+## Development Process Notes
+1. Build & Development
+   - Use `yarn dev` for development with HMR
+   - Run `yarn build` regularly in parallel to catch type/lint errors
+   - Clear `.next` cache when encountering build issues
+   - Monitor realtime subscriptions for proper cleanup
 
-### Extensibility Features
-1. **Metadata Fields**
-   ✅ Every table includes metadata JSONB field
+2. Code Organization
+   - Components structured by feature (tickets/, auth/)
+   - Shared UI components in ui/
+   - Services layer for API calls
+   - Context providers for state management
 
-2. **Activity Logging**
-   ⏳ Comprehensive activity tracking
-   ⏳ Future audit trails and analytics
-
-3. **Attachment System**
-   ✅ Separate table for attachments
-   ✅ Supports file uploads
-   ✅ Storage path implementation
-
-### Security Considerations
-1. **Row Level Security (RLS)**
-   🚧 Clients can only view their own tickets
-   ⏳ Agents can view assigned and unassigned tickets
-   ⏳ Admins have full access
-
-2. **Audit Trail**
-   ⏳ All changes tracked in ticket_activities
-
-### Performance Considerations
-✅ Basic implementation complete
-🚧 Need to implement sorting and filtering
-⏳ Pagination support needed
+3. UI/UX Patterns
+   - Modal dialogs for forms and detailed views
+   - Consistent error handling and loading states
+   - Real-time updates for ticket changes
+   - Responsive layout with fixed navigation
 
 ## Next Steps Priority List
-1. Implement ticket details view with comments/replies
-2. Add sorting and filtering to ticket list
+1. Add sorting and filtering to ticket list
+2. Implement commenting system
 3. Build out agent dashboard and ticket assignment
-4. Implement ticket activity logging
-5. Add pagination for better performance
+4. Add pagination for better performance
+5. Implement ticket activity logging
 
 ## 1. User Flows
 
