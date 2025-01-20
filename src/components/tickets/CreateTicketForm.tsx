@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Paperclip } from 'lucide-react'
+import { TicketPriority, TICKET_PRIORITIES } from '@/config/tickets'
 
 interface CreateTicketFormProps {
   onSubmit: (data: {
     subject: string
     description: string
-    priority: 'low' | 'medium' | 'high'
+    priority: TicketPriority
     attachments?: File[]
   }) => void
   onCancel: () => void
@@ -14,8 +15,9 @@ interface CreateTicketFormProps {
 export function CreateTicketForm({ onSubmit, onCancel }: CreateTicketFormProps) {
   const [subject, setSubject] = useState('')
   const [description, setDescription] = useState('')
-  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium')
+  const [priority, setPriority] = useState<TicketPriority>('medium')
   const [attachments, setAttachments] = useState<File[]>([])
+  const [isDragging, setIsDragging] = useState(false)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -25,6 +27,25 @@ export function CreateTicketForm({ onSubmit, onCancel }: CreateTicketFormProps) 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       setAttachments(Array.from(e.target.files))
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    
+    if (e.dataTransfer.files) {
+      setAttachments(Array.from(e.dataTransfer.files))
     }
   }
 
@@ -64,19 +85,31 @@ export function CreateTicketForm({ onSubmit, onCancel }: CreateTicketFormProps) 
 
       {/* Priority */}
       <div>
-        <label htmlFor="priority" className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
           Priority
         </label>
-        <select
-          id="priority"
-          value={priority}
-          onChange={(e) => setPriority(e.target.value as 'low' | 'medium' | 'high')}
-          className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-        </select>
+        <div className="flex gap-3">
+          {TICKET_PRIORITIES.map((option) => (
+            <label
+              key={option.value}
+              className={`flex-1 cursor-pointer ${
+                priority === option.value 
+                  ? option.color + ' border-2' 
+                  : 'bg-gray-50 border border-gray-200 text-gray-600'
+              } rounded-lg px-4 py-2 text-sm font-medium transition-colors`}
+            >
+              <input
+                type="radio"
+                name="priority"
+                value={option.value}
+                checked={priority === option.value}
+                onChange={(e) => setPriority(e.target.value as TicketPriority)}
+                className="sr-only"
+              />
+              {option.label}
+            </label>
+          ))}
+        </div>
       </div>
 
       {/* File Attachments */}
@@ -84,9 +117,18 @@ export function CreateTicketForm({ onSubmit, onCancel }: CreateTicketFormProps) 
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Attachments
         </label>
-        <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg">
+        <div
+          className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-lg transition-colors ${
+            isDragging
+              ? 'border-blue-400 bg-blue-50'
+              : 'border-gray-300 hover:border-gray-400'
+          }`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
           <div className="space-y-1 text-center">
-            <Paperclip className="mx-auto h-12 w-12 text-gray-400" />
+            <Paperclip className={`mx-auto h-12 w-12 ${isDragging ? 'text-blue-400' : 'text-gray-400'}`} />
             <div className="flex text-sm text-gray-600">
               <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500">
                 <span>Upload files</span>
