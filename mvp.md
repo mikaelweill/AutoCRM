@@ -1,5 +1,84 @@
 # AutoCRM MVP Specification
 
+## Progress Update
+✅ = Completed
+🚧 = In Progress
+⏳ = Not Started
+
+## 1. User Flows
+
+### Client Flow
+1. Authentication
+   ✅ Sign up/Sign in with email
+   ✅ Redirected to client dashboard
+
+2. Ticket Management
+   ✅ Create new ticket
+     ✅ Fill form with subject, description, priority
+     ✅ Optional: attach files
+   ✅ View own tickets
+     ✅ List of all tickets with status
+     🚧 Sort by date, status, priority
+   🚧 View ticket details
+     ⏳ See ticket history and updates
+     ⏳ Add comments/replies
+     ⏳ View agent responses
+
+### Agent Flow
+1. Authentication
+   ⏳ Sign in (agent accounts created by admin)
+   ⏳ Redirected to agent dashboard
+
+2. Ticket Management
+   ⏳ View assigned tickets
+   ⏳ View ticket queue
+   ⏳ Ticket Actions
+
+### Admin Flow
+⏳ All features not started
+
+## 2. Database Schema (Supabase)
+✅ profiles
+✅ tickets
+⏳ ticket_activities
+✅ attachments
+
+## 3. Key Design Decisions
+
+### Extensibility Features
+1. **Metadata Fields**
+   ✅ Every table includes metadata JSONB field
+
+2. **Activity Logging**
+   ⏳ Comprehensive activity tracking
+   ⏳ Future audit trails and analytics
+
+3. **Attachment System**
+   ✅ Separate table for attachments
+   ✅ Supports file uploads
+   ✅ Storage path implementation
+
+### Security Considerations
+1. **Row Level Security (RLS)**
+   🚧 Clients can only view their own tickets
+   ⏳ Agents can view assigned and unassigned tickets
+   ⏳ Admins have full access
+
+2. **Audit Trail**
+   ⏳ All changes tracked in ticket_activities
+
+### Performance Considerations
+✅ Basic implementation complete
+🚧 Need to implement sorting and filtering
+⏳ Pagination support needed
+
+## Next Steps Priority List
+1. Implement ticket details view with comments/replies
+2. Add sorting and filtering to ticket list
+3. Build out agent dashboard and ticket assignment
+4. Implement ticket activity logging
+5. Add pagination for better performance
+
 ## 1. User Flows
 
 ### Client Flow

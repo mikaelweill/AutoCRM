@@ -40,7 +40,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log('Auth state changed:', event, session?.user)
             setUser(session?.user ?? null)
             
-            if (event === 'SIGNED_OUT') {
+            if (event === 'SIGNED_IN') {
+              router.push('/')
+            } else if (event === 'SIGNED_OUT') {
               router.push('/auth/login')
             }
           }
