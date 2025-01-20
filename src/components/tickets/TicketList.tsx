@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Ticket, getTickets, cancelTicket } from '@/services/tickets'
-import { TICKET_PRIORITIES } from '@/config/tickets'
+import { TICKET_PRIORITIES, TICKET_STATUSES } from '@/config/tickets'
 
 export function TicketList() {
   const [tickets, setTickets] = useState<Ticket[]>([])
@@ -151,15 +151,7 @@ export function TicketList() {
               </span>
               <span
                 className={`${
-                  ticket.status === 'new'
-                    ? 'bg-blue-50 text-blue-700'
-                    : ticket.status === 'in_progress'
-                    ? 'bg-yellow-50 text-yellow-700'
-                    : ticket.status === 'resolved'
-                    ? 'bg-green-50 text-green-700'
-                    : ticket.status === 'cancelled'
-                    ? 'bg-red-50 text-red-700'
-                    : 'bg-gray-50 text-gray-700'
+                  TICKET_STATUSES.find((s) => s.value === ticket.status)?.color
                 } px-2.5 py-0.5 rounded-full text-sm font-medium`}
               >
                 {ticket.status.replace('_', ' ')}

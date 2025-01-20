@@ -1,4 +1,5 @@
 export type TicketPriority = 'low' | 'medium' | 'high' | 'urgent'
+export type TicketStatus = 'new' | 'in_progress' | 'resolved' | 'closed' | 'cancelled'
 
 export const TICKET_PRIORITIES: {
   value: TicketPriority
@@ -37,6 +38,44 @@ export const TICKET_PRIORITIES: {
   }
 ]
 
+export const TICKET_STATUSES: {
+  value: TicketStatus
+  label: string
+  color: string
+  description?: string
+}[] = [
+  {
+    value: 'new',
+    label: 'New',
+    color: 'bg-blue-50 text-blue-700',
+    description: 'Ticket has been created but not yet addressed'
+  },
+  {
+    value: 'in_progress',
+    label: 'In Progress',
+    color: 'bg-yellow-50 text-yellow-700',
+    description: 'Work has begun on the ticket'
+  },
+  {
+    value: 'resolved',
+    label: 'Resolved',
+    color: 'bg-green-50 text-green-700',
+    description: 'The issue has been resolved'
+  },
+  {
+    value: 'closed',
+    label: 'Closed',
+    color: 'bg-gray-50 text-gray-700',
+    description: 'Ticket has been closed'
+  },
+  {
+    value: 'cancelled',
+    label: 'Cancelled',
+    color: 'bg-red-50 text-red-700',
+    description: 'Ticket has been cancelled'
+  }
+]
+
 // Helper function to get priority details
 export function getPriorityDetails(priority: TicketPriority) {
   return TICKET_PRIORITIES.find(p => p.value === priority)
@@ -45,4 +84,9 @@ export function getPriorityDetails(priority: TicketPriority) {
 // Helper to check if a priority is high severity (for special handling)
 export function isHighSeverity(priority: TicketPriority) {
   return priority === 'high' || priority === 'urgent'
+}
+
+// Helper function to get status details
+export function getStatusDetails(status: TicketStatus) {
+  return TICKET_STATUSES.find(s => s.value === status)
 } 

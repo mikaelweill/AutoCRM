@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase'
-import { TicketPriority } from '@/config/tickets'
+import { TicketPriority, TicketStatus } from '@/config/tickets'
 
 export interface CreateTicketData {
   subject: string
@@ -18,7 +18,7 @@ export interface Ticket {
   number: number
   subject: string
   description: string
-  status: 'new' | 'in_progress' | 'resolved' | 'closed' | 'cancelled'
+  status: TicketStatus
   priority: TicketPriority
   client_id: string
   agent_id: string | null
