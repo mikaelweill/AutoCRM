@@ -40,8 +40,9 @@ export function CreateTicketForm({ onSuccess, onCancel }: CreateTicketFormProps)
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setAttachments(Array.from(e.target.files))
+    const files = e.target.files
+    if (files && files.length > 0) {
+      setAttachments(prev => [...prev, ...Array.from(files)])
     }
   }
 
@@ -59,9 +60,14 @@ export function CreateTicketForm({ onSuccess, onCancel }: CreateTicketFormProps)
     e.preventDefault()
     setIsDragging(false)
     
-    if (e.dataTransfer.files) {
-      setAttachments(Array.from(e.dataTransfer.files))
+    const files = e.dataTransfer.files
+    if (files && files.length > 0) {
+      setAttachments(prev => [...prev, ...Array.from(files)])
     }
+  }
+
+  const handleRemoveAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index))
   }
 
   return (
@@ -177,8 +183,19 @@ export function CreateTicketForm({ onSuccess, onCancel }: CreateTicketFormProps)
         {attachments.length > 0 && (
           <ul className="mt-2 space-y-1">
             {attachments.map((file, index) => (
-              <li key={index} className="text-sm text-gray-500">
-                {file.name} ({Math.round(file.size / 1024)}KB)
+              <li 
+                key={index} 
+                className="flex items-center justify-between text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded"
+              >
+                <span>{file.name} ({Math.round(file.size / 1024)}KB)</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveAttachment(index)}
+                  className="ml-2 text-red-500 hover:text-red-700"
+                  disabled={isSubmitting}
+                >
+                  Remove
+                </button>
               </li>
             ))}
           </ul>
