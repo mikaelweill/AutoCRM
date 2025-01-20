@@ -2,8 +2,6 @@
 
 import { useState } from 'react'
 import { useAuth } from "@/contexts/AuthContext"
-import { PlusCircle } from 'lucide-react'
-import { Modal } from '@/components/ui/Modal'
 import { CreateTicketForm } from '@/components/tickets/CreateTicketForm'
 import { TicketList } from '@/components/tickets/TicketList'
 import { Dialog } from '@/components/ui/Dialog'
@@ -19,7 +17,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
+    <div className="h-full overflow-auto p-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-semibold text-gray-900">Tickets</h1>
         <Button onClick={() => setIsCreateModalOpen(true)}>

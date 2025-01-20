@@ -36,9 +36,9 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen flex">
       <Navigation />
-      <main className="flex-1 p-8">
+      <main className="flex-1">
         {children}
       </main>
     </div>

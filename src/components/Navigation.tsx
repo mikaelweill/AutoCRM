@@ -20,7 +20,7 @@ export function Navigation() {
   if (!user) return null
 
   return (
-    <aside className="w-64 bg-gray-50 border-r h-screen flex flex-col">
+    <aside className="w-64 bg-gray-50 border-r flex flex-col">
       <div className="p-4 border-b">
         <Link href="/" className="text-xl font-semibold">
           Help Desk
