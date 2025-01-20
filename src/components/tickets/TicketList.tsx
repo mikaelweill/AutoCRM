@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { Ticket, getTickets, cancelTicket } from '@/services/tickets'
+import { Ticket, getTickets, cancelTicket, getAttachmentUrl } from '@/services/tickets'
 import { TICKET_PRIORITIES, TICKET_STATUSES } from '@/config/tickets'
 
 export function TicketList() {
@@ -10,6 +10,7 @@ export function TicketList() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isCancelling, setIsCancelling] = useState<string | null>(null)
+  const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({})
 
   useEffect(() => {
     const supabase = createClient()
@@ -109,6 +110,15 @@ export function TicketList() {
     }
   }
 
+  // Get attachment URL and cache it
+  async function handleGetAttachmentUrl(path: string) {
+    if (attachmentUrls[path]) return attachmentUrls[path]
+    
+    const url = await getAttachmentUrl(path)
+    setAttachmentUrls(prev => ({ ...prev, [path]: url }))
+    return url
+  }
+
   if (isLoading) {
     return <div className="text-center py-8">Loading tickets...</div>
   }
@@ -159,16 +169,38 @@ export function TicketList() {
             </div>
           </div>
           <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
-            <div className="flex items-center gap-4">
-              <span>
-                Created by:{' '}
-                {ticket.client.full_name || ticket.client.email || 'Unknown'}
-              </span>
-              {ticket.agent_id && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-4">
                 <span>
-                  Assigned to:{' '}
-                  {ticket.agent?.full_name || ticket.agent?.email || 'Unknown'}
+                  Created by:{' '}
+                  {ticket.client.full_name || ticket.client.email || 'Unknown'}
                 </span>
+                {ticket.agent_id && (
+                  <span>
+                    Assigned to:{' '}
+                    {ticket.agent?.full_name || ticket.agent?.email || 'Unknown'}
+                  </span>
+                )}
+              </div>
+              {ticket.attachments && ticket.attachments.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-700">Attachments:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {ticket.attachments.map((attachment) => (
+                      <a
+                        key={attachment.id}
+                        href={attachmentUrls[attachment.storage_path] || '#'}
+                        onClick={async (e) => {
+                          e.preventDefault()
+                          window.open(await handleGetAttachmentUrl(attachment.storage_path), '_blank')
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-sm text-blue-600 hover:text-blue-700 hover:underline bg-blue-50 rounded"
+                      >
+                        {attachment.file_name}
+                      </a>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
             <div className="flex items-center gap-2">

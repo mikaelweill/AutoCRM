@@ -13,6 +13,16 @@ interface User {
   full_name: string | null
 }
 
+interface Attachment {
+  id: string
+  ticket_id: string
+  file_name: string
+  file_type: string
+  file_size: number
+  storage_path: string
+  created_at: string
+}
+
 export interface Ticket {
   id: string
   number: number
@@ -27,6 +37,7 @@ export interface Ticket {
   resolved_at: string | null
   client: User
   agent: User | null
+  attachments?: Attachment[]
 }
 
 export async function createTicket(data: CreateTicketData) {
@@ -116,7 +127,15 @@ export async function getTickets() {
     .select(`
       *,
       client:client_id(email, full_name),
-      agent:agent_id(email, full_name)
+      agent:agent_id(email, full_name),
+      attachments(
+        id,
+        file_name,
+        file_type,
+        file_size,
+        storage_path,
+        created_at
+      )
     `)
     .neq('status', 'cancelled')
     .order('created_at', { ascending: false })
@@ -126,6 +145,7 @@ export async function getTickets() {
     throw new Error('Failed to fetch tickets')
   }
 
+  console.log('Fetched tickets with attachments:', tickets)
   return tickets
 }
 
@@ -191,4 +211,10 @@ export async function cancelTicket(ticketId: string) {
 
   console.log('Successfully cancelled ticket:', updatedTicket)
   return updatedTicket
+}
+
+export async function getAttachmentUrl(path: string) {
+  const supabase = createClient()
+  const { data } = await supabase.storage.from('attachments').getPublicUrl(path)
+  return data.publicUrl
 } 
