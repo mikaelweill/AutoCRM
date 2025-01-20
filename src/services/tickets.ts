@@ -18,7 +18,7 @@ export interface Ticket {
   number: number
   subject: string
   description: string
-  status: 'new' | 'in_progress' | 'resolved' | 'closed'
+  status: 'new' | 'in_progress' | 'resolved' | 'closed' | 'cancelled'
   priority: TicketPriority
   client_id: string
   agent_id: string | null
@@ -126,4 +126,68 @@ export async function getTickets() {
   }
 
   return tickets
+}
+
+export async function cancelTicket(ticketId: string) {
+  console.log('Attempting to cancel ticket:', ticketId)
+  const supabase = createClient()
+  
+  // Get the current user
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) {
+    console.error('Error getting user:', userError)
+    throw new Error('User must be logged in to cancel ticket')
+  }
+
+  // First verify the ticket exists and belongs to the user
+  const { data: existingTicket, error: fetchError } = await supabase
+    .from('tickets')
+    .select()
+    .eq('id', ticketId)
+    .eq('client_id', user.id)
+    .single()
+
+  if (fetchError || !existingTicket) {
+    console.error('Error fetching ticket:', fetchError)
+    throw new Error('Ticket not found or access denied')
+  }
+
+  console.log('Found existing ticket:', existingTicket)
+
+  // Perform the update with explicit conditions
+  const { data: updateResult, error: updateError } = await supabase
+    .from('tickets')
+    .update({ 
+      status: 'cancelled',
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', ticketId)
+    .eq('client_id', user.id) // Ensure user owns the ticket
+    .select()
+
+  if (updateError) {
+    console.error('Error updating ticket:', updateError)
+    throw updateError
+  }
+
+  console.log('Update result:', updateResult)
+
+  // Fetch the updated ticket
+  const { data: updatedTicket, error: refetchError } = await supabase
+    .from('tickets')
+    .select(`
+      *,
+      client:client_id(email, full_name),
+      agent:agent_id(email, full_name)
+    `)
+    .eq('id', ticketId)
+    .single()
+
+  if (refetchError || !updatedTicket) {
+    console.error('Error fetching updated ticket:', refetchError)
+    throw new Error('Failed to fetch updated ticket')
+  }
+
+  console.log('Successfully cancelled ticket:', updatedTicket)
+  return updatedTicket
 } 

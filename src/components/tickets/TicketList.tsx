@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { Ticket, getTickets } from '@/services/tickets'
+import { Ticket, getTickets, cancelTicket } from '@/services/tickets'
 import { TICKET_PRIORITIES } from '@/config/tickets'
 
 export function TicketList() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isCancelling, setIsCancelling] = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -83,6 +84,31 @@ export function TicketList() {
     }
   }
 
+  async function handleCancelTicket(ticketId: string) {
+    try {
+      console.log('Starting ticket cancellation for:', ticketId)
+      setIsCancelling(ticketId)
+      setError(null)
+      
+      const updatedTicket = await cancelTicket(ticketId)
+      console.log('Ticket cancelled successfully:', updatedTicket)
+      
+      // Manually update the tickets list in case realtime fails
+      setTickets(tickets => tickets.map(ticket => 
+        ticket.id === ticketId 
+          ? { ...ticket, status: 'cancelled' }
+          : ticket
+      ))
+    } catch (err) {
+      console.error('Error cancelling ticket:', err)
+      setError('Failed to cancel ticket. Please try again.')
+      // Refresh the list to ensure we're in sync
+      fetchTickets()
+    } finally {
+      setIsCancelling(null)
+    }
+  }
+
   if (isLoading) {
     return <div className="text-center py-8">Loading tickets...</div>
   }
@@ -131,6 +157,8 @@ export function TicketList() {
                     ? 'bg-yellow-50 text-yellow-700'
                     : ticket.status === 'resolved'
                     ? 'bg-green-50 text-green-700'
+                    : ticket.status === 'cancelled'
+                    ? 'bg-red-50 text-red-700'
                     : 'bg-gray-50 text-gray-700'
                 } px-2.5 py-0.5 rounded-full text-sm font-medium`}
               >
@@ -151,14 +179,25 @@ export function TicketList() {
                 </span>
               )}
             </div>
-            <span>
-              {new Date(ticket.created_at).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
-            </span>
+            <div className="flex items-center gap-2">
+              <span>
+                {new Date(ticket.created_at).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </span>
+              {ticket.status !== 'cancelled' && (
+                <button
+                  onClick={() => handleCancelTicket(ticket.id)}
+                  disabled={isCancelling === ticket.id}
+                  className="px-2 py-1 text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isCancelling === ticket.id ? 'Cancelling...' : 'Cancel'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       ))}
