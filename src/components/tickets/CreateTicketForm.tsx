@@ -1,3 +1,5 @@
+'use client'
+
 import { useState } from 'react'
 import { Paperclip } from 'lucide-react'
 import { TicketPriority, TICKET_PRIORITIES } from '@/config/tickets'

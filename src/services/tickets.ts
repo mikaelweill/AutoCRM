@@ -35,19 +35,17 @@ export async function createTicket(data: CreateTicketData) {
   const supabase = createClient()
   
   // First get the session
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+  const { data: { user }, error: sessionError } = await supabase.auth.getUser()
   if (sessionError) {
     console.error('Session error:', sessionError)
     throw new Error('Failed to get auth session')
   }
   
-  if (!session) {
+  if (!user) {
     console.error('No active session')
     throw new Error('User must be logged in to create a ticket')
   }
   
-  // Then get the user from the session
-  const user = session.user
   console.log('Auth user:', user)
 
   try {
