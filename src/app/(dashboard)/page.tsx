@@ -10,14 +10,8 @@ export default function Home() {
   const { user } = useAuth()
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
-  const handleCreateTicket = async (data: {
-    subject: string
-    description: string
-    priority: 'low' | 'medium' | 'high'
-    attachments?: File[]
-  }) => {
-    // TODO: Implement ticket creation
-    console.log('Creating ticket:', data)
+  const handleCreateTicket = async (ticketId: string) => {
+    // Close modal and potentially refresh tickets list
     setIsCreateModalOpen(false)
   }
 
@@ -79,7 +73,7 @@ export default function Home() {
         title="Create New Ticket"
       >
         <CreateTicketForm
-          onSubmit={handleCreateTicket}
+          onSuccess={handleCreateTicket}
           onCancel={() => setIsCreateModalOpen(false)}
         />
       </Modal>

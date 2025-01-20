@@ -1,27 +1,40 @@
 import { useState } from 'react'
 import { Paperclip } from 'lucide-react'
 import { TicketPriority, TICKET_PRIORITIES } from '@/config/tickets'
+import { createTicket } from '@/services/tickets'
 
 interface CreateTicketFormProps {
-  onSubmit: (data: {
-    subject: string
-    description: string
-    priority: TicketPriority
-    attachments?: File[]
-  }) => void
+  onSuccess?: (ticketId: string) => void
   onCancel: () => void
 }
 
-export function CreateTicketForm({ onSubmit, onCancel }: CreateTicketFormProps) {
+export function CreateTicketForm({ onSuccess, onCancel }: CreateTicketFormProps) {
   const [subject, setSubject] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<TicketPriority>('medium')
   const [attachments, setAttachments] = useState<File[]>([])
   const [isDragging, setIsDragging] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit({ subject, description, priority, attachments })
+    setIsSubmitting(true)
+    setError(null)
+
+    try {
+      const ticket = await createTicket({
+        subject,
+        description,
+        priority,
+        attachments
+      })
+      onSuccess?.(ticket.id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create ticket')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,6 +64,12 @@ export function CreateTicketForm({ onSubmit, onCancel }: CreateTicketFormProps) 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="p-3 text-sm text-red-700 bg-red-50 rounded-lg">
+          {error}
+        </div>
+      )}
+
       {/* Subject */}
       <div>
         <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-1">
@@ -64,6 +83,7 @@ export function CreateTicketForm({ onSubmit, onCancel }: CreateTicketFormProps) 
           className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="Brief description of the issue"
           required
+          disabled={isSubmitting}
         />
       </div>
 
@@ -80,6 +100,7 @@ export function CreateTicketForm({ onSubmit, onCancel }: CreateTicketFormProps) 
           className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="Detailed explanation of your issue"
           required
+          disabled={isSubmitting}
         />
       </div>
 
@@ -96,7 +117,9 @@ export function CreateTicketForm({ onSubmit, onCancel }: CreateTicketFormProps) 
                 priority === option.value 
                   ? option.color + ' border-2' 
                   : 'bg-gray-50 border border-gray-200 text-gray-600'
-              } rounded-lg px-4 py-2 text-sm font-medium transition-colors`}
+              } rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
               <input
                 type="radio"
@@ -105,6 +128,7 @@ export function CreateTicketForm({ onSubmit, onCancel }: CreateTicketFormProps) 
                 checked={priority === option.value}
                 onChange={(e) => setPriority(e.target.value as TicketPriority)}
                 className="sr-only"
+                disabled={isSubmitting}
               />
               {option.label}
             </label>
@@ -122,7 +146,7 @@ export function CreateTicketForm({ onSubmit, onCancel }: CreateTicketFormProps) 
             isDragging
               ? 'border-blue-400 bg-blue-50'
               : 'border-gray-300 hover:border-gray-400'
-          }`}
+          } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
@@ -130,7 +154,7 @@ export function CreateTicketForm({ onSubmit, onCancel }: CreateTicketFormProps) 
           <div className="space-y-1 text-center">
             <Paperclip className={`mx-auto h-12 w-12 ${isDragging ? 'text-blue-400' : 'text-gray-400'}`} />
             <div className="flex text-sm text-gray-600">
-              <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500">
+              <label htmlFor="file-upload" className={`relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 ${isSubmitting ? 'cursor-not-allowed' : ''}`}>
                 <span>Upload files</span>
                 <input
                   id="file-upload"
@@ -138,6 +162,7 @@ export function CreateTicketForm({ onSubmit, onCancel }: CreateTicketFormProps) 
                   className="sr-only"
                   multiple
                   onChange={handleFileChange}
+                  disabled={isSubmitting}
                 />
               </label>
               <p className="pl-1">or drag and drop</p>
@@ -163,15 +188,17 @@ export function CreateTicketForm({ onSubmit, onCancel }: CreateTicketFormProps) 
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-800"
+          className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-800 disabled:opacity-50"
+          disabled={isSubmitting}
         >
           Cancel
         </button>
         <button
           type="submit"
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          disabled={isSubmitting}
         >
-          Create Ticket
+          {isSubmitting ? 'Creating...' : 'Create Ticket'}
         </button>
       </div>
     </form>
