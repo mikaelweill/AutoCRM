@@ -1,4 +1,4 @@
-Updated PRD: Zendesk Clone
+Updated PRD: AutoCRM
 Project Overview
 Build a simplified customer service platform for managing customer inquiries and support tickets. The platform will include a ticketing system, knowledge base, and a basic user role system. The stack prioritizes Next.js for the frontend and Supabase for backend functionality.
 
