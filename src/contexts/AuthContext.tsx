@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User } from '@supabase/supabase-js'
-import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase'
 
 type AuthContextType = {
   user: User | null
@@ -27,7 +27,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await fetch('https://nkicqyftdkfphifgvejh.supabase.co/functions/v1/check-role', {
         headers: {
-          Authorization: `Bearer ${accessToken}`
+          Authorization: `Bearer ${accessToken}`,
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
         }
       })
 
@@ -37,26 +38,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Failed to check role')
       }
       
-      const { role } = await response.json()
-      console.log('Edge Function returned role:', role)
+      const roleData = await response.json()
+      console.log('Edge Function returned role data:', roleData)
 
-      switch (role) {
-        case 'client':
-          router.push('/client')
-          break
-        case 'agent':
-          router.push('/agent')
-          break
-        case 'admin':
-          router.push('/admin')
-          break
-        default:
-          console.error('Unknown role:', role)
-          router.push('/unauthorized')
+      if (roleData.isClient) {
+        router.push('/client-portal')
+      } else if (roleData.isAgent) {
+        router.push('/agent-portal')
+      } else if (roleData.isAdmin) {
+        router.push('/admin-portal')
+      } else {
+        console.error('Unknown role:', roleData)
+        await supabase.auth.signOut()
+        router.push('/auth/login?error=unauthorized')
       }
     } catch (error) {
       console.error('Error checking role:', error)
-      router.push('/unauthorized')
+      await supabase.auth.signOut()
+      router.push('/auth/login?error=role-check-failed')
     }
   }
 

@@ -1,20 +1,20 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
+import type { Metadata } from "next"
+import { Inter } from "next/font/google"
+import "./globals.css"
 import { AuthProvider } from '@/contexts/AuthContext'
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "AutoCRM",
-  description: "Customer support ticket management system",
+  description: "CRM system for automotive dealerships",
   icons: {
     icon: [
       { url: '/autocrm.ico', type: 'image/x-icon' },
       { url: '/autocrm.ico' }
     ],
   },
-};
+}
 
 export default function RootLayout({
   children,
@@ -29,5 +29,5 @@ export default function RootLayout({
         </AuthProvider>
       </body>
     </html>
-  );
-}
+  )
+} 
