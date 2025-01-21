@@ -7,7 +7,8 @@ export default function LoginPage() {
       <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-sm">
         <AuthForm
           title="Welcome to Help Desk - Admin Portal"
-          redirectTo="/admin-portal"
+          description="Sign in to manage the help desk system"
+          redirectTo={`${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`}
           appearance={{
             theme: ThemeSupa,
             variables: {

@@ -6,11 +6,12 @@ import { useAuth } from '../../contexts/AuthContext'
 import { createClient } from '../../lib/supabase'
 
 interface PortalPageProps {
-  children: React.ReactNode
+  children?: React.ReactNode
   requiredRole: 'client' | 'agent' | 'admin'
+  title?: string
 }
 
-export function PortalPage({ children, requiredRole }: PortalPageProps) {
+export function PortalPage({ children, requiredRole, title }: PortalPageProps) {
   const { user, loading } = useAuth()
   const router = useRouter()
   const [roleVerified, setRoleVerified] = useState(false)
@@ -81,5 +82,10 @@ export function PortalPage({ children, requiredRole }: PortalPageProps) {
     return null
   }
 
-  return <>{children}</>
+  return (
+    <div className="p-8">
+      {title && <h1 className="text-2xl font-semibold mb-6">{title}</h1>}
+      {children}
+    </div>
+  )
 } 
