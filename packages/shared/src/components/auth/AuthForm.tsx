@@ -10,6 +10,7 @@ interface AuthFormProps {
   title?: string
   description?: string
   redirectTo?: string
+  providers?: string[]
   appearance?: {
     theme: typeof ThemeSupa
     variables?: {
@@ -27,6 +28,7 @@ export function AuthForm({
   title = 'Welcome back',
   description = 'Sign in to your account',
   redirectTo,
+  providers = [],
   appearance = {
     theme: ThemeSupa,
     variables: {
@@ -72,7 +74,7 @@ export function AuthForm({
         <Auth
           supabaseClient={supabase}
           appearance={appearance}
-          providers={['google', 'github']}
+          providers={providers}
           redirectTo={redirectTo || `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`}
           localization={{
             variables: {

@@ -4,8 +4,9 @@ import { ThemeSupa } from '@supabase/auth-ui-shared'
 export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
+      <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-sm">
         <AuthForm
+          title="Welcome to Help Desk"
           redirectTo="/client-portal"
           appearance={{
             theme: ThemeSupa,
