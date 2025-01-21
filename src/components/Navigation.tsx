@@ -12,7 +12,7 @@ export function Navigation() {
   const isActive = (path: string) => pathname === path
 
   const links = [
-    { href: '/tickets', label: 'Tickets' },
+    { href: '/', label: 'Tickets' },
     { href: '/knowledge-base', label: 'Knowledge Base' },
     { href: '/reports', label: 'Reports' },
   ]
