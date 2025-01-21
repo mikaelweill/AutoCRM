@@ -190,7 +190,7 @@
 ### Files to Remove
 1. **Redundant Files**:
    - ✅ `apps/client/src/app/layout 2.tsx`
-   - `apps/client/src/middleware.ts` (after moving to app dir)
+   - ❌ `apps/client/src/middleware.ts` (CORRECTION: should stay in src/)
 
 2. **Redundant Folders**:
    - ✅ `apps/client/src/app/client/`
@@ -219,7 +219,7 @@
    - Organize sub-routes under portal
 
 3. **File Organization**:
-   - Move middleware to app directory
+   - ✅ Keep middleware.ts in src/ directory (Next.js requirement)
    - Clean up duplicate layouts
    - Ensure consistent naming
 

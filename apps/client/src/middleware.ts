@@ -10,7 +10,7 @@ export async function middleware(req: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession()
 
   // Auth pages are accessible without session
-  if (req.nextUrl.pathname.startsWith('/login') || req.nextUrl.pathname.startsWith('/client/auth')) {
+  if (req.nextUrl.pathname.startsWith('/auth/login') || req.nextUrl.pathname.startsWith('/client/auth')) {
     if (session) {
       // If user is signed in, redirect to client portal
       return NextResponse.redirect(new URL('/client-portal', req.url))
@@ -21,7 +21,7 @@ export async function middleware(req: NextRequest) {
 
   // Protected routes
   if (!session) {
-    return NextResponse.redirect(new URL('/login', req.url))
+    return NextResponse.redirect(new URL('/auth/login', req.url))
   }
 
   return res

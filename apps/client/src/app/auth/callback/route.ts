@@ -15,12 +15,12 @@ export async function GET(request: Request) {
       
       if (sessionError) {
         console.error('Error exchanging code for session:', sessionError)
-        return NextResponse.redirect(new URL('/login?error=auth', requestUrl.origin))
+        return NextResponse.redirect(new URL('/auth/login?error=auth', requestUrl.origin))
       }
 
       if (!session) {
         console.error('No session established')
-        return NextResponse.redirect(new URL('/login?error=no_session', requestUrl.origin))
+        return NextResponse.redirect(new URL('/auth/login?error=no_session', requestUrl.origin))
       }
 
       // Check user role using edge function
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
       if (!roleResponse.ok) {
         const errorText = await roleResponse.text()
         console.error('Edge function error:', errorText)
-        return NextResponse.redirect(new URL('/login?error=role', requestUrl.origin))
+        return NextResponse.redirect(new URL('/auth/login?error=role', requestUrl.origin))
       }
       
       const { role } = await roleResponse.json()
@@ -42,16 +42,16 @@ export async function GET(request: Request) {
       if (role !== 'client') {
         console.error('User is not a client:', role)
         await supabase.auth.signOut()
-        return NextResponse.redirect(new URL('/login?error=unauthorized', requestUrl.origin))
+        return NextResponse.redirect(new URL('/auth/login?error=unauthorized', requestUrl.origin))
       }
 
       return NextResponse.redirect(new URL('/client-portal', requestUrl.origin))
     }
 
     console.error('No code received in callback')
-    return NextResponse.redirect(new URL('/login?error=no_code', requestUrl.origin))
+    return NextResponse.redirect(new URL('/auth/login?error=no_code', requestUrl.origin))
   } catch (error) {
     console.error('Callback error:', error)
-    return NextResponse.redirect(new URL('/login?error=unknown', requestUrl.origin))
+    return NextResponse.redirect(new URL('/auth/login?error=unknown', requestUrl.origin))
   }
 } 
