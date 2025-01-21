@@ -31,6 +31,7 @@
     "autoprefixer": "^10.0.1",
     "eslint": "^8.56.0",
     "eslint-config-next": "14.1.0",
+    "flat-cache": "^6.1.5",
     "postcss": "^8",
     "sucrase": "^3.35.0",
     "supabase": "^2.6.8",

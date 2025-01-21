@@ -23,6 +23,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
   const router = useRouter()
 
+  const redirectBasedOnRole = async (accessToken: string) => {
+    try {
+      const response = await fetch('https://nkicqyftdkfphifgvejh.supabase.co/functions/v1/check-role', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Edge function error:', errorText)
+        throw new Error('Failed to check role')
+      }
+      
+      const { role } = await response.json()
+      console.log('Edge Function returned role:', role)
+
+      switch (role) {
+        case 'client':
+          router.push('/client')
+          break
+        case 'agent':
+          router.push('/agent')
+          break
+        case 'admin':
+          router.push('/admin')
+          break
+        default:
+          console.error('Unknown role:', role)
+          router.push('/unauthorized')
+      }
+    } catch (error) {
+      console.error('Error checking role:', error)
+      router.push('/unauthorized')
+    }
+  }
+
   useEffect(() => {
     // Check active sessions and set up auth state listener
     const initAuth = async () => {
@@ -32,7 +69,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (sessionError) throw sessionError
         
         setUser(session?.user ?? null)
-        console.log('Initial session user:', session?.user)
+        if (session?.user) {
+          redirectBasedOnRole(session.access_token)
+        }
         
         // Set up auth state change listener
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -40,8 +79,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log('Auth state changed:', event, session?.user)
             setUser(session?.user ?? null)
             
-            if (event === 'SIGNED_IN') {
-              router.push('/')
+            if (event === 'SIGNED_IN' && session?.user) {
+              redirectBasedOnRole(session.access_token)
             } else if (event === 'SIGNED_OUT') {
               router.push('/auth/login')
             }

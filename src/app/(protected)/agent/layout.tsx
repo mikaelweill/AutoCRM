@@ -3,13 +3,15 @@
 import { Navigation } from "@/components/Navigation"
 import { useAuth } from "@/contexts/AuthContext"
 
-const clientNavLinks = [
-  { href: '/', label: 'Tickets' },
-  { href: '/knowledge-base', label: 'Knowledge Base' },
-  { href: '/reports', label: 'Reports' },
+const agentNavLinks = [
+  { href: '/agent', label: 'Dashboard' },
+  { href: '/agent/queue', label: 'Ticket Queue' },
+  { href: '/agent/my-tickets', label: 'My Tickets' },
+  { href: '/agent/all-tickets', label: 'All Tickets' },
+  { href: '/agent/create', label: 'Create Agent' }
 ]
 
-export default function ClientLayout({
+export default function AgentLayout({
   children,
 }: {
   children: React.ReactNode
@@ -30,7 +32,7 @@ export default function ClientLayout({
 
   return (
     <div className="h-screen flex">
-      <Navigation links={clientNavLinks} title="Client Portal" />
+      <Navigation links={agentNavLinks} title="Agent Portal" />
       <main className="flex-1">
         {children}
       </main>
