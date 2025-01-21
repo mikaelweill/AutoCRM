@@ -20,6 +20,7 @@ interface TicketDetailsProps {
   ticket: Ticket
   onClose: () => void
   onCancel?: (ticketId: string) => Promise<void>
+  onAssign?: (ticketId: string) => Promise<void>
   isCancelling?: boolean
   getAttachmentUrl?: (path: string) => Promise<string>
 }
@@ -42,6 +43,7 @@ export function TicketDetails({
   ticket, 
   onClose,
   onCancel,
+  onAssign,
   isCancelling,
   getAttachmentUrl: externalGetAttachmentUrl
 }: TicketDetailsProps) {
@@ -49,7 +51,17 @@ export function TicketDetails({
   const [activities, setActivities] = useState<TicketActivity[]>([])
   const [replyContent, setReplyContent] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null)
   const supabase = createClient()
+
+  // Get current user
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setCurrentUser(user)
+      }
+    })
+  }, [])
 
   // Get attachment URL and cache it
   async function handleGetAttachmentUrl(path: string) {
@@ -136,6 +148,9 @@ export function TicketDetails({
     }
   }
 
+  // Check if current user is the assigned agent
+  const isAssignedAgent = currentUser && ticket.agent_id === currentUser.id
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -207,36 +222,47 @@ export function TicketDetails({
           ))}
         </div>
 
-        {/* Reply Form */}
-        <form onSubmit={handleSubmitReply} className="mt-4">
-          <Textarea
-            value={replyContent}
-            onChange={(e) => setReplyContent(e.target.value)}
-            placeholder="Add a reply..."
-            className="mb-2"
-            rows={3}
-          />
-          <div className="flex justify-between">
-            <Button
-              type="submit"
-              disabled={!replyContent.trim() || isSubmitting}
-              loading={isSubmitting}
-            >
-              Add Reply
-            </Button>
-            {onCancel && ticket.status !== 'cancelled' && (
+        {/* Reply Form - Only show if user is assigned agent */}
+        {isAssignedAgent ? (
+          <form onSubmit={handleSubmitReply} className="mt-4">
+            <Textarea
+              value={replyContent}
+              onChange={(e) => setReplyContent(e.target.value)}
+              placeholder="Add a reply..."
+              className="mb-2"
+              rows={3}
+            />
+            <div className="flex justify-between">
               <Button
-                type="button"
-                variant="danger"
-                onClick={() => onCancel(ticket.id)}
-                disabled={isCancelling}
-                loading={isCancelling}
+                type="submit"
+                disabled={!replyContent.trim() || isSubmitting}
+                loading={isSubmitting}
               >
-                Cancel Ticket
+                Add Reply
               </Button>
-            )}
-          </div>
-        </form>
+              {onCancel && ticket.status !== 'cancelled' && (
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={() => onCancel(ticket.id)}
+                  disabled={isCancelling}
+                  loading={isCancelling}
+                >
+                  Cancel Ticket
+                </Button>
+              )}
+            </div>
+          </form>
+        ) : (
+          // Show assign button if ticket is unassigned
+          !ticket.agent_id && onAssign && (
+            <div className="mt-4 flex justify-center">
+              <Button onClick={() => onAssign(ticket.id)}>
+                Assign to Me to Reply
+              </Button>
+            </div>
+          )
+        )}
       </div>
 
       {/* Metadata */}
@@ -256,12 +282,10 @@ export function TicketDetails({
             <span className="font-medium">Created: </span>
             {new Date(ticket.created_at).toLocaleString()}
           </div>
-          {ticket.resolved_at && (
-            <div>
-              <span className="font-medium">Resolved: </span>
-              {new Date(ticket.resolved_at).toLocaleString()}
-            </div>
-          )}
+          <div>
+            <span className="font-medium">Last updated: </span>
+            {new Date(ticket.updated_at).toLocaleString()}
+          </div>
         </div>
       </div>
     </div>

@@ -545,4 +545,272 @@ export async function assignTicket(ticketId: string): Promise<Ticket> {
 
   console.log('Successfully assigned ticket:', updatedTicket)
   return updatedTicket
+}
+
+export async function closeTicket(ticketId: string): Promise<Ticket> {
+  console.log('Attempting to close ticket:', ticketId)
+  const supabase = createClient()
+  
+  // Get current user (agent)
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) {
+    console.error('Error getting user:', userError)
+    throw new Error('User must be logged in to close ticket')
+  }
+
+  // First verify the ticket exists and is assigned to the current agent
+  const { data: existingTicket, error: fetchError } = await supabase
+    .from('tickets')
+    .select(`
+      *,
+      client:client_id(id, email, full_name, role),
+      agent:agent_id(id, email, full_name, role),
+      attachments(
+        id,
+        file_name,
+        file_type,
+        file_size,
+        storage_path,
+        created_at
+      )
+    `)
+    .eq('id', ticketId)
+    .eq('agent_id', user.id)
+    .single()
+
+  if (fetchError) {
+    console.error('Error fetching ticket:', fetchError)
+    throw new Error('Failed to fetch ticket')
+  }
+
+  if (!existingTicket) {
+    throw new Error('Ticket not found or not assigned to you')
+  }
+
+  if (!isTicket(existingTicket)) {
+    console.error('Invalid ticket data:', existingTicket)
+    throw new Error('Invalid ticket data received')
+  }
+
+  console.log('Found assigned ticket:', existingTicket)
+
+  // Update the ticket status to closed
+  const { error: updateError } = await supabase
+    .from('tickets')
+    .update({ 
+      status: 'closed',
+      resolved_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', ticketId)
+    .eq('agent_id', user.id)
+
+  if (updateError) {
+    console.error('Error updating ticket:', updateError)
+    throw updateError
+  }
+
+  // Create an activity record for the status change
+  const { error: activityError } = await supabase
+    .from('ticket_activities')
+    .insert({
+      ticket_id: ticketId,
+      user_id: user.id,
+      activity_type: 'status_change',
+      content: 'Ticket closed',
+      is_internal: true
+    })
+
+  if (activityError) {
+    console.error('Error creating activity record:', activityError)
+    // Don't throw here as the main update was successful
+  }
+
+  // Fetch the updated ticket
+  const { data: updatedTicket, error: refetchError } = await supabase
+    .from('tickets')
+    .select(`
+      *,
+      client:client_id(id, email, full_name, role),
+      agent:agent_id(id, email, full_name, role),
+      attachments(
+        id,
+        file_name,
+        file_type,
+        file_size,
+        storage_path,
+        created_at
+      )
+    `)
+    .eq('id', ticketId)
+    .single()
+
+  if (refetchError || !updatedTicket) {
+    console.error('Error fetching updated ticket:', refetchError)
+    throw new Error('Failed to fetch updated ticket')
+  }
+
+  if (!isTicket(updatedTicket)) {
+    throw new Error('Invalid updated ticket data received')
+  }
+
+  console.log('Successfully closed ticket:', updatedTicket)
+  return updatedTicket
+}
+
+export async function getMyTickets(): Promise<Ticket[]> {
+  const supabase = createClient()
+  
+  // Get current user
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) throw new Error('Failed to get current user')
+
+  const { data: rawTickets, error } = await supabase
+    .from('tickets')
+    .select(`
+      *,
+      client:client_id(id, email, full_name, role),
+      agent:agent_id(id, email, full_name, role),
+      attachments(
+        id,
+        file_name,
+        file_type,
+        file_size,
+        storage_path,
+        created_at
+      )
+    `)
+    .eq('agent_id', user.id)
+    .neq('status', 'cancelled')
+    .order('updated_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching tickets:', error)
+    throw new Error('Failed to fetch tickets')
+  }
+
+  // Cast through unknown first
+  const tickets = rawTickets as unknown
+  
+  // Now cast to an array and filter with type guard
+  const validTickets = (tickets as any[]).filter(ticket => {
+    const isValid = isTicket(ticket)
+    if (!isValid) {
+      console.warn('Invalid ticket data:', ticket)
+    }
+    return isValid
+  })
+
+  return validTickets
+}
+
+export async function unassignTicket(ticketId: string): Promise<Ticket> {
+  console.log('Attempting to unassign ticket:', ticketId)
+  const supabase = createClient()
+  
+  // Get current user (agent)
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) {
+    console.error('Error getting user:', userError)
+    throw new Error('User must be logged in to unassign ticket')
+  }
+
+  // First verify the ticket exists and is assigned to the current agent
+  const { data: existingTicket, error: fetchError } = await supabase
+    .from('tickets')
+    .select(`
+      *,
+      client:client_id(id, email, full_name, role),
+      agent:agent_id(id, email, full_name, role),
+      attachments(
+        id,
+        file_name,
+        file_type,
+        file_size,
+        storage_path,
+        created_at
+      )
+    `)
+    .eq('id', ticketId)
+    .eq('agent_id', user.id)
+    .single()
+
+  if (fetchError) {
+    console.error('Error fetching ticket:', fetchError)
+    throw new Error('Failed to fetch ticket')
+  }
+
+  if (!existingTicket) {
+    throw new Error('Ticket not found or not assigned to you')
+  }
+
+  if (!isTicket(existingTicket)) {
+    console.error('Invalid ticket data:', existingTicket)
+    throw new Error('Invalid ticket data received')
+  }
+
+  console.log('Found assigned ticket:', existingTicket)
+
+  // Update the ticket to remove agent and set status back to new
+  const { error: updateError } = await supabase
+    .from('tickets')
+    .update({ 
+      agent_id: null,
+      status: 'new',
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', ticketId)
+    .eq('agent_id', user.id)
+
+  if (updateError) {
+    console.error('Error updating ticket:', updateError)
+    throw updateError
+  }
+
+  // Create an activity record for the unassignment
+  const { error: activityError } = await supabase
+    .from('ticket_activities')
+    .insert({
+      ticket_id: ticketId,
+      user_id: user.id,
+      activity_type: 'agent_assignment',
+      content: 'Ticket unassigned from agent',
+      is_internal: true
+    })
+
+  if (activityError) {
+    console.error('Error creating activity record:', activityError)
+    // Don't throw here as the main update was successful
+  }
+
+  // Fetch the updated ticket
+  const { data: updatedTicket, error: refetchError } = await supabase
+    .from('tickets')
+    .select(`
+      *,
+      client:client_id(id, email, full_name, role),
+      agent:agent_id(id, email, full_name, role),
+      attachments(
+        id,
+        file_name,
+        file_type,
+        file_size,
+        storage_path,
+        created_at
+      )
+    `)
+    .eq('id', ticketId)
+    .single()
+
+  if (refetchError || !updatedTicket) {
+    console.error('Error fetching updated ticket:', refetchError)
+    throw new Error('Failed to fetch updated ticket')
+  }
+
+  if (!isTicket(updatedTicket)) {
+    throw new Error('Invalid updated ticket data received')
+  }
+
+  console.log('Successfully unassigned ticket:', updatedTicket)
+  return updatedTicket
 } 
