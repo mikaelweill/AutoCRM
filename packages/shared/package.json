@@ -10,8 +10,11 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.0",
+    "@heroicons/react": "^2.2.0",
     "@supabase/auth-helpers-nextjs": "^0.9.0",
-    "@supabase/supabase-js": "^2.39.0"
+    "@supabase/supabase-js": "^2.39.0",
+    "lucide-react": "^0.473.0"
   },
   "devDependencies": {
     "@types/node": "^20",
@@ -26,4 +29,4 @@
     "next": "14.1.0",
     "react": "^18.2.0"
   }
-} 
+}

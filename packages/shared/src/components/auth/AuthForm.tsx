@@ -4,13 +4,13 @@ import { Auth } from '@supabase/auth-ui-react'
 import { ThemeSupa } from '@supabase/auth-ui-shared'
 import { createClient } from '../../lib/supabase'
 import { useEffect } from 'react'
-import { AuthChangeEvent, Session } from '@supabase/supabase-js'
+import { AuthChangeEvent, Session, Provider } from '@supabase/supabase-js'
 
 interface AuthFormProps {
   title?: string
   description?: string
   redirectTo?: string
-  providers?: string[]
+  providers?: Provider[]
   appearance?: {
     theme: typeof ThemeSupa
     variables?: {

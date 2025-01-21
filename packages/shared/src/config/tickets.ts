@@ -47,31 +47,31 @@ export const TICKET_STATUSES: {
   {
     value: 'new',
     label: 'New',
-    color: 'bg-blue-50 text-blue-700',
-    description: 'Ticket has been created but not yet addressed'
+    color: 'bg-blue-100 text-blue-800',
+    description: 'Ticket has been created but not yet reviewed'
   },
   {
     value: 'in_progress',
     label: 'In Progress',
-    color: 'bg-yellow-50 text-yellow-700',
-    description: 'Work has begun on the ticket'
+    color: 'bg-yellow-100 text-yellow-800',
+    description: 'Ticket is being worked on'
   },
   {
     value: 'resolved',
     label: 'Resolved',
-    color: 'bg-green-50 text-green-700',
-    description: 'The issue has been resolved'
+    color: 'bg-green-100 text-green-800',
+    description: 'Issue has been resolved'
   },
   {
     value: 'closed',
     label: 'Closed',
-    color: 'bg-gray-50 text-gray-700',
+    color: 'bg-gray-100 text-gray-800',
     description: 'Ticket has been closed'
   },
   {
     value: 'cancelled',
     label: 'Cancelled',
-    color: 'bg-red-50 text-red-700',
+    color: 'bg-red-100 text-red-800',
     description: 'Ticket has been cancelled'
   }
 ]
@@ -80,10 +80,10 @@ export function getPriorityDetails(priority: TicketPriority) {
   return TICKET_PRIORITIES.find(p => p.value === priority)
 }
 
-export function isHighSeverity(priority: TicketPriority) {
-  return priority === 'high' || priority === 'urgent'
-}
-
 export function getStatusDetails(status: TicketStatus) {
   return TICKET_STATUSES.find(s => s.value === status)
+}
+
+export function isHighSeverity(priority: TicketPriority): boolean {
+  return priority === 'high' || priority === 'urgent'
 } 
