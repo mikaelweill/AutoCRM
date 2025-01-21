@@ -1,4 +1,6 @@
+import React from 'react'
 import { RootLayout } from 'shared'
+import { AuthProvider } from 'shared'
 import './globals.css'
 
 export const metadata = {
@@ -11,5 +13,11 @@ export default function Layout({
 }: {
   children: React.ReactNode
 }) {
-  return <RootLayout>{children}</RootLayout>
+  return (
+    <RootLayout>
+      <AuthProvider appType="admin">
+        {children}
+      </AuthProvider>
+    </RootLayout>
+  )
 } 

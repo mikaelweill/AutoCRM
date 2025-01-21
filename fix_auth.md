@@ -1,3 +1,29 @@
+# Agent Portal Auth Fix Summary
+
+## Issue Resolution (2024-01-21)
+
+1. **Initial Issue**: 
+   - Auth state changed to SIGNED_IN
+   - Role check confirmed user was agent
+   - PortalPage failed with "User does not have required role: undefined"
+
+2. **Root Cause**: 
+   - AuthProvider missing in agent app's root layout
+   - PortalPage missing required `requiredRole` prop
+
+3. **Fixes Applied**:
+   - Added AuthProvider to `apps/agent/src/app/layout.tsx` with `appType="agent"`
+   - Added `requiredRole="agent"` to PortalPage in `apps/agent/src/app/agent-portal/page.tsx`
+   - Added support for `title` prop in PortalPage component
+
+4. **Final Working Flow**:
+   - User logs in → Auth state changes to SIGNED_IN
+   - AuthProvider detects change and checks role via edge function
+   - On confirmation of agent role, redirects to `/agent-portal`
+   - PortalPage verifies role again and displays content
+
+---
+
 # Auth Debugging Process
 
 ## Current Status
