@@ -5,17 +5,21 @@ import { useAuth } from '@/contexts/AuthContext'
 import { usePathname } from 'next/navigation'
 import { LogOut } from 'lucide-react'
 
-export function Navigation() {
+type NavigationLink = {
+  href: string
+  label: string
+}
+
+type NavigationProps = {
+  links: NavigationLink[]
+  title?: string
+}
+
+export function Navigation({ links, title = "Help Desk" }: NavigationProps) {
   const { user, signOut } = useAuth()
   const pathname = usePathname()
 
   const isActive = (path: string) => pathname === path
-
-  const links = [
-    { href: '/', label: 'Tickets' },
-    { href: '/knowledge-base', label: 'Knowledge Base' },
-    { href: '/reports', label: 'Reports' },
-  ]
 
   if (!user) return null
 
@@ -23,7 +27,7 @@ export function Navigation() {
     <aside className="w-64 bg-gray-50 border-r flex flex-col">
       <div className="p-4 border-b">
         <Link href="/" className="text-xl font-semibold">
-          Help Desk
+          {title}
         </Link>
       </div>
       <nav className="p-4 flex-1">
