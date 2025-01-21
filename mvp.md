@@ -1,3 +1,63 @@
+# Agent Portal Implementation Battle Plan (2024-01-21)
+
+## Phase 1: Core Structure & Authentication ✅
+- ✅ Set up agent app layout with AuthProvider
+- ✅ Create agent login page
+- ✅ Set up role-based protection
+
+## Phase 2: Dashboard & Navigation 🚧
+1. Create agent dashboard with:
+   - Quick stats
+     - Unassigned tickets count
+     - Active tickets count
+     - Urgent tickets count
+     - Resolved tickets today
+   - Recent activity section
+   - Navigation layout:
+     - Dashboard
+     - Ticket Queue (unassigned)
+     - My Tickets (assigned to me)
+     - All Tickets
+
+### Component Strategy
+1. **Reusable Components from Shared**:
+   - `Navigation.tsx` - Will reuse with agent-specific nav items
+   - `TicketList.tsx` - Will extend with agent actions
+   - `TicketDetails.tsx` - Will add status update capabilities
+   - Portal layout components for consistent structure
+   - UI components for stats and metrics display
+
+2. **New Components Needed**:
+   - `AgentDashboard.tsx` - Quick stats and activity overview
+   - `TicketQueue.tsx` - Unassigned tickets management
+   - `AgentTicketActions.tsx` - Agent-specific actions
+   - `TicketStatusUpdate.tsx` - Status management interface
+   - `AgentStats.tsx` - Performance metrics display
+
+## Phase 3: Ticket Management ⏳
+1. View assigned tickets:
+   - List view with sorting (priority, status, date)
+   - Ticket details modal/page
+2. View ticket queue:
+   - List of unassigned tickets
+   - Self-assign functionality
+3. Ticket actions:
+   - Update ticket status
+   - Add internal notes
+   - Respond to client
+   - Mark as resolved
+
+## Phase 4: Advanced Features ⏳
+1. Filtering and search:
+   - By status, priority, date
+   - Search by ticket number or content
+2. Performance metrics:
+   - Response time
+   - Resolution rate
+   - Active tickets count
+
+---
+
 # AutoCRM MVP Specification
 
 ## Core Features
