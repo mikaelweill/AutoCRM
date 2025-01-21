@@ -180,10 +180,18 @@ export function TicketList() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <span className={getPriorityColor(ticket.priority)}>
+                <span
+                  className={`${
+                    TICKET_PRIORITIES.find((p) => p.value === ticket.priority)?.badgeColor || 'bg-gray-100 text-gray-800'
+                  } px-2.5 py-0.5 rounded-full text-sm font-medium`}
+                >
                   {TICKET_PRIORITIES.find(p => p.value === ticket.priority)?.label || ticket.priority}
                 </span>
-                <span className={getStatusColor(ticket.status)}>
+                <span
+                  className={`${
+                    TICKET_STATUSES.find((s) => s.value === ticket.status)?.color || 'bg-gray-100 text-gray-800'
+                  } px-2.5 py-0.5 rounded-full text-sm font-medium`}
+                >
                   {TICKET_STATUSES.find(s => s.value === ticket.status)?.label || ticket.status}
                 </span>
               </div>
@@ -227,27 +235,30 @@ export function TicketList() {
                   </div>
                 )}
               </div>
-              <span>
-                {new Date(ticket.created_at).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-              </span>
+              <div className="flex items-center gap-2">
+                <span>
+                  {new Date(ticket.created_at).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </span>
+                {ticket.status !== 'cancelled' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation() // Prevent opening modal when clicking cancel
+                      handleCancelTicket(ticket.id)
+                    }}
+                    disabled={isCancelling === ticket.id}
+                    className="px-2 py-1 text-sm font-medium text-red-600 hover:text-red-700 bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isCancelling === ticket.id ? 'Cancelling...' : 'Cancel'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-          {ticket.status !== 'cancelled' && (
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={() => handleCancelTicket(ticket.id)}
-                disabled={isCancelling === ticket.id}
-                className="px-2 py-1 text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isCancelling === ticket.id ? 'Cancelling...' : 'Cancel'}
-              </button>
-            </div>
-          )}
         </div>
       ))}
 
