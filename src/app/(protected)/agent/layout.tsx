@@ -1,7 +1,6 @@
 'use client'
 
 import { Navigation } from "@/components/Navigation"
-import { useAuth } from "@/contexts/AuthContext"
 
 const agentNavLinks = [
   { href: '/agent', label: 'Dashboard' },
@@ -16,24 +15,10 @@ export default function AgentLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { user, loading } = useAuth()
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return null // Will be handled by ProtectedLayout
-  }
-
   return (
     <div className="h-screen flex">
       <Navigation links={agentNavLinks} title="Agent Portal" />
-      <main className="flex-1">
+      <main className="flex-1 overflow-auto">
         {children}
       </main>
     </div>

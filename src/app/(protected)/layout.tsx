@@ -1,9 +1,11 @@
 'use client'
 
 import { useAuth } from "@/contexts/AuthContext"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import { createClient } from '@/lib/supabase'
+
+type UserRole = 'client' | 'agent' | null
 
 export default function ProtectedLayout({
   children,
@@ -12,14 +14,15 @@ export default function ProtectedLayout({
 }) {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [isAuthorized, setIsAuthorized] = useState(false)
+  const pathname = usePathname()
+  const [userRole, setUserRole] = useState<UserRole>(null)
   const [isChecking, setIsChecking] = useState(true)
   const supabase = createClient()
 
   useEffect(() => {
     if (loading) return
     if (!user) {
-      router.push('/auth/login')
+      router.replace('/auth/login')
       return
     }
 
@@ -29,31 +32,39 @@ export default function ProtectedLayout({
         
         if (error) throw error
         
-        console.log('Role check response:', data)
-        
-        // For now, just authorize if we get a valid response
-        setIsAuthorized(true)
-      } catch (err) {
-        console.error('Error checking role:', err)
-        router.push('/auth/login')
+        // Set the user's role
+        if (data.isClient) setUserRole('client')
+        else if (data.isAgent) setUserRole('agent')
+        else throw new Error('Invalid role')
+
+        // Check if user is trying to access the wrong section
+        const isInAgentSection = pathname.startsWith('/agent')
+        const isInClientSection = pathname.startsWith('/client')
+
+        if (isInAgentSection && !data.isAgent) {
+          router.replace('/unauthorized')
+        } else if (isInClientSection && !data.isClient) {
+          router.replace('/unauthorized')
+        }
+      } catch (error) {
+        console.error('Error checking role:', error)
+        router.replace('/unauthorized')
       } finally {
         setIsChecking(false)
       }
     }
 
     checkRole()
-  }, [user, loading, router, supabase.functions])
+  }, [user, loading, router, pathname, supabase.functions])
 
+  // Show nothing while checking
   if (loading || isChecking) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
-      </div>
-    )
+    return null
   }
 
-  if (!isAuthorized) {
-    return null // Will be redirected by useEffect
+  // Show nothing if no role (will be redirected)
+  if (!userRole) {
+    return null
   }
 
   return children
