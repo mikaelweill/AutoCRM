@@ -65,6 +65,13 @@ export interface TicketActivity {
   user: Pick<User, 'id' | 'email' | 'full_name'>
 }
 
+export interface DashboardStats {
+  totalOpenTickets: number
+  unassignedTickets: number
+  highPriorityTickets: number
+  myActiveTickets: number
+}
+
 // Type guards
 function isUser(data: unknown): data is User {
   const user = data as User
@@ -391,4 +398,40 @@ export async function addTicketReply(ticketId: string, content: string): Promise
   }
 
   return data
+}
+
+export async function getAgentDashboardStats(): Promise<DashboardStats> {
+  const supabase = createClient()
+  
+  // Get current user
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) throw new Error('Failed to get current user')
+
+  // Fetch all relevant tickets in one query for efficiency
+  const { data: tickets, error: ticketsError } = await supabase
+    .from('tickets')
+    .select('*')
+    .in('status', ['new', 'in_progress']) // Get both new and in_progress tickets
+
+  if (ticketsError) {
+    console.error('Error fetching tickets:', ticketsError)
+    throw new Error('Failed to fetch ticket stats')
+  }
+
+  if (!tickets) {
+    throw new Error('No tickets data received')
+  }
+
+  const stats: DashboardStats = {
+    // Total open = all tickets that need attention (new + in_progress)
+    totalOpenTickets: tickets.length,
+    // Unassigned = new tickets waiting for an agent
+    unassignedTickets: tickets.filter(t => !t.agent_id && t.status === 'new').length,
+    // High priority = urgent matters regardless of status
+    highPriorityTickets: tickets.filter(t => t.priority === 'high' || t.priority === 'urgent').length,
+    // My active = tickets I'm currently working on
+    myActiveTickets: tickets.filter(t => t.agent_id === user.id && t.status === 'in_progress').length
+  }
+
+  return stats
 } 
