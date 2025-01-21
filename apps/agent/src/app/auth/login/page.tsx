@@ -1,19 +1,14 @@
-'use client'
-
-import { Auth } from '@supabase/auth-ui-react'
+import { AuthForm } from 'shared'
 import { ThemeSupa } from '@supabase/auth-ui-shared'
-import { createClient } from '@/lib/supabase'
 
-export default function Login() {
-  const supabase = createClient()
-
+export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-sm">
-        <h1 className="text-2xl font-semibold mb-6 text-center">Welcome to Help Desk - Agent Portal</h1>
-        <Auth
-          supabaseClient={supabase}
-          appearance={{ 
+        <AuthForm
+          title="Welcome to Help Desk - Agent Portal"
+          redirectTo="/agent-portal"
+          appearance={{
             theme: ThemeSupa,
             variables: {
               default: {
@@ -24,8 +19,6 @@ export default function Login() {
               }
             }
           }}
-          providers={['google', 'github']}
-          redirectTo={`${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`}
         />
       </div>
     </div>
