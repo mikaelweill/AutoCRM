@@ -7,7 +7,7 @@ import { TicketList } from '@/components/tickets/TicketList'
 import { Dialog } from '@/components/ui/Dialog'
 import { Button } from '@/components/ui/Button'
 
-export default function DashboardPage() {
+export default function ClientDashboardPage() {
   const { user } = useAuth()
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 

@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(session?.user ?? null)
             
             if (event === 'SIGNED_IN') {
-              router.push('/test')
+              router.push('/')
             } else if (event === 'SIGNED_OUT') {
               router.push('/auth/login')
             }

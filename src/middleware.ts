@@ -12,7 +12,7 @@ export async function middleware(req: NextRequest) {
   // Auth pages are accessible without session
   if (req.nextUrl.pathname.startsWith('/auth')) {
     if (session) {
-      // If user is signed in, redirect to home page
+      // If user is signed in, redirect to dashboard
       return NextResponse.redirect(new URL('/', req.url))
     }
     // Allow access to auth pages
