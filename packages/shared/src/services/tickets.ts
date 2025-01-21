@@ -278,7 +278,19 @@ export async function cancelTicket(ticketId: string): Promise<Ticket> {
   // First verify the ticket exists and belongs to the user
   const { data: existingTicket, error: fetchError } = await supabase
     .from('tickets')
-    .select()
+    .select(`
+      *,
+      client:client_id(id, email, full_name, role),
+      agent:agent_id(id, email, full_name, role),
+      attachments(
+        id,
+        file_name,
+        file_type,
+        file_size,
+        storage_path,
+        created_at
+      )
+    `)
     .eq('id', ticketId)
     .eq('client_id', user.id)
     .single()
@@ -289,13 +301,14 @@ export async function cancelTicket(ticketId: string): Promise<Ticket> {
   }
 
   if (!isTicket(existingTicket)) {
+    console.error('Invalid ticket data:', existingTicket)
     throw new Error('Invalid ticket data received')
   }
 
   console.log('Found existing ticket:', existingTicket)
 
   // Perform the update with explicit conditions
-  const { data: updateResult, error: updateError } = await supabase
+  const { error: updateError } = await supabase
     .from('tickets')
     .update({ 
       status: 'cancelled',
@@ -303,7 +316,6 @@ export async function cancelTicket(ticketId: string): Promise<Ticket> {
     })
     .eq('id', ticketId)
     .eq('client_id', user.id)
-    .select()
 
   if (updateError) {
     console.error('Error updating ticket:', updateError)
@@ -315,8 +327,16 @@ export async function cancelTicket(ticketId: string): Promise<Ticket> {
     .from('tickets')
     .select(`
       *,
-      client:client_id(email, full_name),
-      agent:agent_id(email, full_name)
+      client:client_id(id, email, full_name, role),
+      agent:agent_id(id, email, full_name, role),
+      attachments(
+        id,
+        file_name,
+        file_type,
+        file_size,
+        storage_path,
+        created_at
+      )
     `)
     .eq('id', ticketId)
     .single()

@@ -164,67 +164,69 @@ export function TicketList() {
       {tickets.map((ticket) => (
         <div
           key={ticket.id}
-          onClick={() => setSelectedTicket(ticket)}
-          className="bg-white shadow rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer"
+          className="bg-white shadow rounded-lg p-6 hover:shadow-md transition-shadow"
         >
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">
-                #{ticket.number} {ticket.subject}
-              </h3>
-              <p className="mt-1 text-sm text-gray-500 line-clamp-2">
-                {ticket.description}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={getPriorityColor(ticket.priority)}>
-                {TICKET_PRIORITIES.find(p => p.value === ticket.priority)?.label || ticket.priority}
-              </span>
-              <span className={getStatusColor(ticket.status)}>
-                {TICKET_STATUSES.find(s => s.value === ticket.status)?.label || ticket.status}
-              </span>
-            </div>
-          </div>
-          <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-4">
-                <span>
-                  Created by:{' '}
-                  {ticket.client.full_name || ticket.client.email || 'Unknown'}
+          <div 
+            onClick={() => setSelectedTicket(ticket)}
+            className="cursor-pointer"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">
+                  #{ticket.number} {ticket.subject}
+                </h3>
+                <p className="mt-1 text-sm text-gray-500 line-clamp-2">
+                  {ticket.description}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={getPriorityColor(ticket.priority)}>
+                  {TICKET_PRIORITIES.find(p => p.value === ticket.priority)?.label || ticket.priority}
                 </span>
-                {ticket.agent_id && (
+                <span className={getStatusColor(ticket.status)}>
+                  {TICKET_STATUSES.find(s => s.value === ticket.status)?.label || ticket.status}
+                </span>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-4">
                   <span>
-                    Assigned to:{' '}
-                    {ticket.agent?.full_name || ticket.agent?.email || 'Unknown'}
+                    Created by:{' '}
+                    {ticket.client.full_name || ticket.client.email || 'Unknown'}
                   </span>
+                  {ticket.agent_id && (
+                    <span>
+                      Assigned to:{' '}
+                      {ticket.agent?.full_name || ticket.agent?.email || 'Unknown'}
+                    </span>
+                  )}
+                </div>
+                {ticket.attachments && ticket.attachments.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-700">Attachments:</span>
+                    <div className="flex flex-wrap gap-2">
+                      {ticket.attachments.map((attachment) => (
+                        <a
+                          key={attachment.id}
+                          href={attachmentUrls[attachment.storage_path] || '#'}
+                          onClick={async (e) => {
+                            e.preventDefault()
+                            e.stopPropagation() // Prevent opening modal when clicking attachment
+                            window.open(
+                              await handleGetAttachmentUrl(attachment.storage_path),
+                              '_blank'
+                            )
+                          }}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-sm text-blue-600 hover:text-blue-700 hover:underline bg-blue-50 rounded"
+                        >
+                          {attachment.file_name}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
-              {ticket.attachments && ticket.attachments.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-700">Attachments:</span>
-                  <div className="flex flex-wrap gap-2">
-                    {ticket.attachments.map((attachment) => (
-                      <a
-                        key={attachment.id}
-                        href={attachmentUrls[attachment.storage_path] || '#'}
-                        onClick={async (e) => {
-                          e.preventDefault()
-                          e.stopPropagation() // Prevent opening modal when clicking attachment
-                          window.open(
-                            await handleGetAttachmentUrl(attachment.storage_path),
-                            '_blank'
-                          )
-                        }}
-                        className="inline-flex items-center gap-1 px-2 py-1 text-sm text-blue-600 hover:text-blue-700 hover:underline bg-blue-50 rounded"
-                      >
-                        {attachment.file_name}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
               <span>
                 {new Date(ticket.created_at).toLocaleDateString('en-US', {
                   month: 'short',
@@ -233,20 +235,19 @@ export function TicketList() {
                   minute: '2-digit'
                 })}
               </span>
-              {ticket.status !== 'cancelled' && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation() // Prevent opening modal when clicking cancel
-                    handleCancelTicket(ticket.id)
-                  }}
-                  disabled={isCancelling === ticket.id}
-                  className="px-2 py-1 text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isCancelling === ticket.id ? 'Cancelling...' : 'Cancel'}
-                </button>
-              )}
             </div>
           </div>
+          {ticket.status !== 'cancelled' && (
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => handleCancelTicket(ticket.id)}
+                disabled={isCancelling === ticket.id}
+                className="px-2 py-1 text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCancelling === ticket.id ? 'Cancelling...' : 'Cancel'}
+              </button>
+            </div>
+          )}
         </div>
       ))}
 
