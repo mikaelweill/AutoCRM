@@ -9,8 +9,7 @@ import { hasRequiredRole } from "shared/src/auth/utils"
 const clientNavLinks = [
   { href: '/client-portal', label: 'Dashboard' },
   { href: '/client-portal/my-tickets', label: 'My Tickets' },
-  { href: '/client-portal/knowledge-base', label: 'Knowledge Base' },
-  { href: '/client-portal/reports', label: 'Reports' }
+  { href: '/client-portal/knowledge-base', label: 'Knowledge Base' }
 ]
 
 export default function ClientLayout({
