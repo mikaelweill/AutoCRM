@@ -135,24 +135,10 @@ export function TicketQueue() {
             onClick={() => setSelectedTicket(ticket)}
           >
             <div className="flex justify-between items-start">
-              <div>
-                <div className="flex items-start justify-between">
-                  <h3 className="font-medium">
-                    #{ticket.number} - {ticket.subject}
-                  </h3>
-                  <div className="flex items-center gap-2 ml-4">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${priorityDetails?.color || 'bg-gray-100 text-gray-800'}`}
-                    >
-                      {priorityDetails?.label || ticket.priority}
-                    </span>
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusDetails?.color || 'bg-gray-100 text-gray-800'}`}
-                    >
-                      {statusDetails?.label || ticket.status}
-                    </span>
-                  </div>
-                </div>
+              <div className="flex-1">
+                <h3 className="font-medium">
+                  #{ticket.number} - {ticket.subject}
+                </h3>
                 <div className="mt-1 text-sm text-gray-500">
                   From: {ticket.client?.full_name || ticket.client?.email || 'Unknown'}
                 </div>
@@ -181,6 +167,18 @@ export function TicketQueue() {
                     </div>
                   </div>
                 )}
+              </div>
+              <div className="flex flex-col gap-2 ml-4">
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusDetails?.color || 'bg-gray-100 text-gray-800'}`}
+                >
+                  {statusDetails?.label || ticket.status}
+                </span>
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${priorityDetails?.color || 'bg-gray-100 text-gray-800'}`}
+                >
+                  {priorityDetails?.label || ticket.priority}
+                </span>
               </div>
             </div>
             <div className="flex justify-end mt-4">

@@ -119,26 +119,28 @@ export function MyTickets() {
           >
             <div className="flex flex-col">
               <div className="flex items-start justify-between">
-                <h3 className="font-medium">
-                  #{ticket.number} - {ticket.subject}
-                </h3>
-                <div className="flex items-center gap-2 ml-4">
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${priorityDetails?.color || 'bg-gray-100 text-gray-800'}`}
-                  >
-                    {priorityDetails?.label || ticket.priority}
-                  </span>
+                <div>
+                  <h3 className="font-medium">
+                    #{ticket.number} - {ticket.subject}
+                  </h3>
+                  <div className="mt-1 text-sm text-gray-500">
+                    From: {ticket.client?.full_name || ticket.client?.email || 'Unknown'}
+                  </div>
+                  <p className="mt-2 text-sm text-gray-700">{ticket.description}</p>
+                </div>
+                <div className="flex flex-col gap-2">
                   <span
                     className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusDetails?.color || 'bg-gray-100 text-gray-800'}`}
                   >
                     {statusDetails?.label || ticket.status}
                   </span>
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${priorityDetails?.color || 'bg-gray-100 text-gray-800'}`}
+                  >
+                    {priorityDetails?.label || ticket.priority}
+                  </span>
                 </div>
               </div>
-              <div className="mt-1 text-sm text-gray-500">
-                From: {ticket.client?.full_name || ticket.client?.email || 'Unknown'}
-              </div>
-              <p className="mt-2 text-sm text-gray-700">{ticket.description}</p>
               {ticket.attachments && ticket.attachments.length > 0 && (
                 <div className="mt-3 flex items-center gap-2">
                   <span className="text-gray-700 text-sm">Attachments:</span>

@@ -179,20 +179,20 @@ export function TicketList() {
                   {ticket.description}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`${
-                    TICKET_PRIORITIES.find((p) => p.value === ticket.priority)?.badgeColor || 'bg-gray-100 text-gray-800'
-                  } px-2.5 py-0.5 rounded-full text-sm font-medium`}
-                >
-                  {TICKET_PRIORITIES.find(p => p.value === ticket.priority)?.label || ticket.priority}
-                </span>
+              <div className="flex flex-col gap-2">
                 <span
                   className={`${
                     TICKET_STATUSES.find((s) => s.value === ticket.status)?.color || 'bg-gray-100 text-gray-800'
                   } px-2.5 py-0.5 rounded-full text-sm font-medium`}
                 >
                   {TICKET_STATUSES.find(s => s.value === ticket.status)?.label || ticket.status}
+                </span>
+                <span
+                  className={`${
+                    TICKET_PRIORITIES.find((p) => p.value === ticket.priority)?.badgeColor || 'bg-gray-100 text-gray-800'
+                  } px-2.5 py-0.5 rounded-full text-sm font-medium`}
+                >
+                  {TICKET_PRIORITIES.find(p => p.value === ticket.priority)?.label || ticket.priority}
                 </span>
               </div>
             </div>
