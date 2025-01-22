@@ -4,7 +4,6 @@ import { Navigation } from "shared/src/components/Navigation"
 import { useAuth } from "shared/src/contexts/AuthContext"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { createClient } from 'shared/src/lib/supabase'
 
 const agentNavLinks = [
   { href: '/agent-portal', label: 'Dashboard' },
@@ -21,7 +20,6 @@ export default function AgentLayout({
   const router = useRouter()
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
-  const supabase = createClient()
 
   useEffect(() => {
     if (loading) return
@@ -30,13 +28,11 @@ export default function AgentLayout({
       return
     }
 
-    const checkRole = async () => {
+    const checkRole = () => {
       try {
-        const { data, error } = await supabase.functions.invoke('check-role')
+        const role = user.app_metadata?.role
         
-        if (error) throw error
-        
-        if (!data.isAgent) {
+        if (role !== 'agent') {
           router.replace('/unauthorized')
           return
         }
@@ -51,23 +47,23 @@ export default function AgentLayout({
     }
 
     checkRole()
-  }, [user, loading, router, supabase.functions])
+  }, [user, loading, router])
+
+  // Show nothing while checking
+  if (loading || isChecking) {
+    return null
+  }
+
+  // Show nothing if not authorized
+  if (!isAuthorized) {
+    return null
+  }
 
   return (
     <div className="h-screen flex">
       <Navigation links={agentNavLinks} title="Agent Portal" />
       <main className="flex-1 overflow-auto">
-        {loading || isChecking ? (
-          <div className="p-8 flex items-center justify-center">
-            <div className="text-gray-500">Loading...</div>
-          </div>
-        ) : !isAuthorized ? (
-          <div className="p-8 flex items-center justify-center">
-            <div className="text-gray-500">Checking authorization...</div>
-          </div>
-        ) : (
-          children
-        )}
+        {children}
       </main>
     </div>
   )

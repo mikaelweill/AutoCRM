@@ -1,7 +1,8 @@
-import React from 'react'
-import { RootLayout } from 'shared'
 import { AuthProvider } from 'shared'
 import './globals.css'
+import { Inter } from 'next/font/google'
+
+const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
   title: 'AutoCRM Admin Portal',
@@ -14,10 +15,12 @@ export default function Layout({
   children: React.ReactNode
 }) {
   return (
-    <RootLayout>
-      <AuthProvider appType="admin">
-        {children}
-      </AuthProvider>
-    </RootLayout>
+    <html lang="en">
+      <body className={inter.className}>
+        <AuthProvider appType="admin">
+          {children}
+        </AuthProvider>
+      </body>
+    </html>
   )
 } 

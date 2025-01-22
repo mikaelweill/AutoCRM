@@ -1,4 +1,4 @@
-import { AuthProvider } from 'shared/src/contexts/AuthContext'
+import { AuthProvider } from 'shared'
 import './globals.css'
 import { Inter } from 'next/font/google'
 
