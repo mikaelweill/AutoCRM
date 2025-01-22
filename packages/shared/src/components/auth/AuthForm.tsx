@@ -91,20 +91,6 @@ export function AuthForm({
           appearance={appearance}
           providers={[]}
           redirectTo={redirectTo || `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`}
-          localization={{
-            variables: {
-              sign_in: {
-                email_label: 'Email address',
-                password_label: 'Password',
-                button_label: 'Sign in',
-                loading_button_label: 'Signing in...',
-                email_input_placeholder: 'Your email',
-                password_input_placeholder: 'Your password',
-              }
-            }
-          }}
-          view="sign_in"
-          showLinks={false}
         />
       </div>
     </div>
