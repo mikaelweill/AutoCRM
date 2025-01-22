@@ -160,7 +160,7 @@ export function TicketList() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-xl space-y-4">
       {tickets.map((ticket) => (
         <div
           key={ticket.id}
@@ -173,7 +173,7 @@ export function TicketList() {
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="text-lg font-medium text-gray-900">
-                  #{ticket.number} {ticket.subject}
+                  {ticket.subject}
                 </h3>
                 <p className="mt-1 text-sm text-gray-500 line-clamp-2">
                   {ticket.description}
@@ -235,7 +235,10 @@ export function TicketList() {
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-4">
+                <span className="text-xs text-gray-400">
+                  ID {ticket.number}
+                </span>
                 <span>
                   {new Date(ticket.created_at).toLocaleDateString('en-US', {
                     month: 'short',

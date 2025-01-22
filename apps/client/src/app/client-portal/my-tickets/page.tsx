@@ -17,26 +17,28 @@ export default function MyTicketsPage() {
   }
 
   return (
-    <div className="h-full overflow-auto p-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900">My Tickets</h1>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          Create Ticket
-        </Button>
+    <div className="h-full overflow-auto">
+      <div className="max-w-3xl mx-auto p-8">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-semibold text-gray-900">My Tickets</h1>
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            Create Ticket
+          </Button>
+        </div>
+
+        <TicketList />
+
+        <Dialog
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          title="Create New Ticket"
+        >
+          <CreateTicketForm
+            onSuccess={handleCreateTicket}
+            onCancel={() => setIsCreateModalOpen(false)}
+          />
+        </Dialog>
       </div>
-
-      <TicketList />
-
-      <Dialog
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        title="Create New Ticket"
-      >
-        <CreateTicketForm
-          onSuccess={handleCreateTicket}
-          onCancel={() => setIsCreateModalOpen(false)}
-        />
-      </Dialog>
     </div>
   )
 } 

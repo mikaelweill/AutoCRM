@@ -123,7 +123,7 @@ export function TicketQueue() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-xl space-y-4">
       {tickets.map((ticket) => {
         const priorityDetails = getPriorityDetails(ticket.priority)
         const statusDetails = getStatusDetails(ticket.status)
@@ -137,7 +137,7 @@ export function TicketQueue() {
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <h3 className="font-medium">
-                  #{ticket.number} - {ticket.subject}
+                  {ticket.subject}
                 </h3>
                 <div className="mt-1 text-sm text-gray-500">
                   From: {ticket.client?.full_name || ticket.client?.email || 'Unknown'}
@@ -182,6 +182,9 @@ export function TicketQueue() {
               </div>
             </div>
             <div className="flex justify-end mt-4">
+              <span className="text-xs text-gray-400 mr-4 self-center">
+                ID {ticket.number}
+              </span>
               <Button
                 onClick={(e) => {
                   e.stopPropagation() // Prevent opening modal when clicking assign

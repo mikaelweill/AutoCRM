@@ -106,7 +106,7 @@ export function MyTickets() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-xl space-y-4">
       {tickets.map((ticket) => {
         const priorityDetails = getPriorityDetails(ticket.priority)
         const statusDetails = getStatusDetails(ticket.status)
@@ -121,7 +121,7 @@ export function MyTickets() {
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-medium">
-                    #{ticket.number} - {ticket.subject}
+                    {ticket.subject}
                   </h3>
                   <div className="mt-1 text-sm text-gray-500">
                     From: {ticket.client?.full_name || ticket.client?.email || 'Unknown'}
@@ -167,6 +167,9 @@ export function MyTickets() {
               )}
               {ticket.status !== 'closed' && (
                 <div className="flex justify-end gap-2 mt-4">
+                  <span className="text-xs text-gray-400 self-center">
+                    ID {ticket.number}
+                  </span>
                   <Button
                     onClick={(e) => {
                       e.stopPropagation() // Prevent opening modal when clicking unassign
