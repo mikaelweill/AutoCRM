@@ -210,6 +210,19 @@ export function TicketList() {
                     </span>
                   )}
                 </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-xs text-gray-400">
+                    ID {ticket.number}
+                  </span>
+                  <span>
+                    {new Date(ticket.created_at).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </span>
+                </div>
                 {ticket.attachments && ticket.attachments.length > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="text-gray-700">Attachments:</span>
@@ -235,18 +248,7 @@ export function TicketList() {
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-4">
-                <span className="text-xs text-gray-400">
-                  ID {ticket.number}
-                </span>
-                <span>
-                  {new Date(ticket.created_at).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </span>
+              <div className="flex items-center gap-2">
                 {ticket.status !== 'cancelled' && (
                   <button
                     onClick={(e) => {

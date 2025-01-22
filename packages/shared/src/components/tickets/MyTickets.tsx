@@ -126,6 +126,9 @@ export function MyTickets() {
                   <div className="mt-1 text-sm text-gray-500">
                     From: {ticket.client?.full_name || ticket.client?.email || 'Unknown'}
                   </div>
+                  <div className="mt-1 text-xs text-gray-400">
+                    ID {ticket.number}
+                  </div>
                   <p className="mt-2 text-sm text-gray-700">{ticket.description}</p>
                 </div>
                 <div className="flex flex-col gap-2">
@@ -167,9 +170,6 @@ export function MyTickets() {
               )}
               {ticket.status !== 'closed' && (
                 <div className="flex justify-end gap-2 mt-4">
-                  <span className="text-xs text-gray-400 self-center">
-                    ID {ticket.number}
-                  </span>
                   <Button
                     onClick={(e) => {
                       e.stopPropagation() // Prevent opening modal when clicking unassign

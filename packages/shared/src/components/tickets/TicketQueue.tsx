@@ -142,6 +142,9 @@ export function TicketQueue() {
                 <div className="mt-1 text-sm text-gray-500">
                   From: {ticket.client?.full_name || ticket.client?.email || 'Unknown'}
                 </div>
+                <div className="mt-1 text-xs text-gray-400">
+                  ID {ticket.number}
+                </div>
                 <p className="mt-2 text-sm text-gray-700">{ticket.description}</p>
                 {ticket.attachments && ticket.attachments.length > 0 && (
                   <div className="mt-3 flex items-center gap-2">
@@ -182,9 +185,6 @@ export function TicketQueue() {
               </div>
             </div>
             <div className="flex justify-end mt-4">
-              <span className="text-xs text-gray-400 mr-4 self-center">
-                ID {ticket.number}
-              </span>
               <Button
                 onClick={(e) => {
                   e.stopPropagation() // Prevent opening modal when clicking assign
