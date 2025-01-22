@@ -3,7 +3,8 @@
 import { Navigation } from "shared/src/components/Navigation"
 import { useAuth } from "shared/src/contexts/AuthContext"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useRef } from "react"
+import { hasRequiredRole } from "shared/src/auth/utils"
 
 const agentNavLinks = [
   { href: '/agent-portal', label: 'Dashboard' },
@@ -18,44 +19,24 @@ export default function AgentLayout({
 }) {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [isAuthorized, setIsAuthorized] = useState(false)
-  const [isChecking, setIsChecking] = useState(true)
+  const wasAuthorized = useRef(false)
 
   useEffect(() => {
+    // Skip during initial load or rehydration
     if (loading) return
-    if (!user) {
-      router.replace('/auth/login')
-      return
+
+    const isAuthorized = Boolean(user && hasRequiredRole(user, 'agent'))
+    
+    // Only redirect if auth status actually changed
+    if (!isAuthorized && wasAuthorized.current) {
+      router.replace(!user ? '/auth/login' : '/unauthorized')
     }
 
-    const checkRole = () => {
-      try {
-        const role = user.app_metadata?.role
-        
-        if (role !== 'agent') {
-          router.replace('/unauthorized')
-          return
-        }
-
-        setIsAuthorized(true)
-      } catch (error) {
-        console.error('Error checking role:', error)
-        router.replace('/unauthorized')
-      } finally {
-        setIsChecking(false)
-      }
-    }
-
-    checkRole()
+    wasAuthorized.current = isAuthorized
   }, [user, loading, router])
 
-  // Show nothing while checking
-  if (loading || isChecking) {
-    return null
-  }
-
-  // Show nothing if not authorized
-  if (!isAuthorized) {
+  // Only block initial render if never authorized
+  if (!wasAuthorized.current && (loading || !user || !hasRequiredRole(user, 'agent'))) {
     return null
   }
 

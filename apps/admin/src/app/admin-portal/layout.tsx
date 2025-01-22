@@ -6,14 +6,14 @@ import { useRouter } from "next/navigation"
 import { useEffect, useRef } from "react"
 import { hasRequiredRole } from "shared/src/auth/utils"
 
-const clientNavLinks = [
-  { href: '/client-portal', label: 'Dashboard' },
-  { href: '/client-portal/my-tickets', label: 'My Tickets' },
-  { href: '/client-portal/knowledge-base', label: 'Knowledge Base' },
-  { href: '/client-portal/reports', label: 'Reports' }
+const adminNavLinks = [
+  { href: '/admin-portal', label: 'Dashboard' },
+  { href: '/admin-portal/users', label: 'Users' },
+  { href: '/admin-portal/settings', label: 'Settings' },
+  { href: '/admin-portal/analytics', label: 'Analytics' }
 ]
 
-export default function ClientLayout({
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode
@@ -26,7 +26,7 @@ export default function ClientLayout({
     // Skip during initial load or rehydration
     if (loading) return
 
-    const isAuthorized = Boolean(user && hasRequiredRole(user, 'client'))
+    const isAuthorized = Boolean(user && hasRequiredRole(user, 'admin'))
     
     // Only redirect if auth status actually changed
     if (!isAuthorized && wasAuthorized.current) {
@@ -37,13 +37,13 @@ export default function ClientLayout({
   }, [user, loading, router])
 
   // Only block initial render if never authorized
-  if (!wasAuthorized.current && (loading || !user || !hasRequiredRole(user, 'client'))) {
+  if (!wasAuthorized.current && (loading || !user || !hasRequiredRole(user, 'admin'))) {
     return null
   }
 
   return (
     <div className="h-screen flex">
-      <Navigation links={clientNavLinks} title="Client Portal" />
+      <Navigation links={adminNavLinks} title="Admin Portal" />
       <main className="flex-1 overflow-auto">
         {children}
       </main>
