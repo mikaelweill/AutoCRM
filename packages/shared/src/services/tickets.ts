@@ -72,6 +72,17 @@ export interface DashboardStats {
   myActiveTickets: number
 }
 
+export interface ClientDashboardStats {
+  totalActiveTickets: number
+  recentlyUpdatedTickets: number
+  averageResolutionHours: number | null
+  ticketsByPriority: {
+    high: number
+    medium: number
+    low: number
+  }
+}
+
 // Type guards
 function isUser(data: unknown): data is User {
   const user = data as User
@@ -813,4 +824,89 @@ export async function unassignTicket(ticketId: string): Promise<Ticket> {
 
   console.log('Successfully unassigned ticket:', updatedTicket)
   return updatedTicket
+}
+
+export async function getClientDashboardStats(): Promise<ClientDashboardStats> {
+  const supabase = createClient()
+  
+  // Get the current user's ID
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) {
+    throw new Error('Failed to get user')
+  }
+
+  const now = new Date()
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+  // Get active tickets count (status not 'closed' or 'cancelled')
+  const { count: activeCount, error: activeError } = await supabase
+    .from('tickets')
+    .select('*', { count: 'exact', head: true })
+    .eq('client_id', user.id)
+    .not('status', 'in', '("closed","cancelled")')
+
+  if (activeError) throw activeError
+
+  // Get recently updated tickets count
+  const { count: recentCount, error: recentError } = await supabase
+    .from('tickets')
+    .select('*', { count: 'exact', head: true })
+    .eq('client_id', user.id)
+    .gt('updated_at', twentyFourHoursAgo.toISOString())
+
+  if (recentError) throw recentError
+
+  // Get average resolution time for tickets resolved in last 30 days
+  const { data: resolvedTickets, error: resolvedError } = await supabase
+    .from('tickets')
+    .select('created_at, resolved_at')
+    .eq('client_id', user.id)
+    .eq('status', 'closed')
+    .gt('resolved_at', thirtyDaysAgo.toISOString())
+    .returns<Array<{ created_at: string; resolved_at: string | null }>>()
+
+  if (resolvedError) throw resolvedError
+
+  // Calculate average resolution time
+  let averageResolutionHours: number | null = null
+  if (resolvedTickets.length > 0) {
+    const totalHours = resolvedTickets.reduce((sum: number, ticket: { created_at: string; resolved_at: string | null }) => {
+      if (!ticket.resolved_at) return sum
+      const created = new Date(ticket.created_at)
+      const resolved = new Date(ticket.resolved_at)
+      return sum + (resolved.getTime() - created.getTime()) / (1000 * 60 * 60)
+    }, 0)
+    averageResolutionHours = Math.round(totalHours / resolvedTickets.length)
+  }
+
+  // Get tickets by priority
+  const { data: priorityTickets, error: priorityError } = await supabase
+    .from('tickets')
+    .select('priority')
+    .eq('client_id', user.id)
+    .not('status', 'in', '("closed","cancelled")')
+    .returns<Array<{ priority: TicketPriority }>>()
+
+  if (priorityError) throw priorityError
+
+  const ticketsByPriority = {
+    high: 0,
+    medium: 0,
+    low: 0
+  }
+
+  priorityTickets.forEach((ticket: { priority: TicketPriority }) => {
+    const priority = ticket.priority.toLowerCase() as keyof typeof ticketsByPriority
+    if (priority in ticketsByPriority) {
+      ticketsByPriority[priority]++
+    }
+  })
+
+  return {
+    totalActiveTickets: activeCount ?? 0,
+    recentlyUpdatedTickets: recentCount ?? 0,
+    averageResolutionHours,
+    ticketsByPriority
+  }
 } 
