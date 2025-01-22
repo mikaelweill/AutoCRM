@@ -3,14 +3,13 @@
 import { Auth } from '@supabase/auth-ui-react'
 import { ThemeSupa } from '@supabase/auth-ui-shared'
 import { createClient } from '../../lib/supabase'
-import { useEffect } from 'react'
-import { AuthChangeEvent, Session, Provider } from '@supabase/supabase-js'
+import { useEffect, useState } from 'react'
+import { AuthChangeEvent, Session } from '@supabase/supabase-js'
 
 interface AuthFormProps {
   title?: string
   description?: string
   redirectTo?: string
-  providers?: Provider[]
   appearance?: {
     theme: typeof ThemeSupa
     variables?: {
@@ -28,7 +27,6 @@ export function AuthForm({
   title = 'Welcome back',
   description = 'Sign in to your account',
   redirectTo,
-  providers = [],
   appearance = {
     theme: ThemeSupa,
     variables: {
@@ -42,22 +40,34 @@ export function AuthForm({
   }
 }: AuthFormProps) {
   const supabase = createClient()
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // Remove console logs in production
+    if (process.env.NODE_ENV === 'production') return
+
     console.log('AuthForm mounted')
     console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
     console.log('Redirect URL:', redirectTo || `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`)
-    
+  }, [redirectTo])
+
+  // Separate effect for auth state to prevent unnecessary re-subscriptions
+  useEffect(() => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
-      console.log('Auth state changed:', event, session)
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Auth state changed:', event, session)
+      }
+      if (event === 'SIGNED_IN') {
+        setError(null)
+      }
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [redirectTo, supabase.auth])
+  }, [supabase.auth])
 
   return (
     <div className="flex min-h-screen flex-1 flex-col justify-center px-6 py-12 lg:px-8">
@@ -71,10 +81,15 @@ export function AuthForm({
       </div>
 
       <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
+        {error && (
+          <div className="mb-4 p-4 text-sm text-red-700 bg-red-100 rounded-md">
+            {error}
+          </div>
+        )}
         <Auth
           supabaseClient={supabase}
           appearance={appearance}
-          providers={providers}
+          providers={[]}
           redirectTo={redirectTo || `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`}
           localization={{
             variables: {
@@ -82,9 +97,14 @@ export function AuthForm({
                 email_label: 'Email address',
                 password_label: 'Password',
                 button_label: 'Sign in',
-              },
-            },
+                loading_button_label: 'Signing in...',
+                email_input_placeholder: 'Your email',
+                password_input_placeholder: 'Your password',
+              }
+            }
           }}
+          view="sign_in"
+          showLinks={false}
         />
       </div>
     </div>
