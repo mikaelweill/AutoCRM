@@ -1,5 +1,5 @@
 import { createClient } from '../lib/supabase'
-import { TicketPriority, TicketStatus } from '../config/tickets'
+import { TicketPriority, TicketStatus, isHighSeverity } from '../config/tickets'
 import { Database } from '../types/database'
 
 // Type aliases for better readability
@@ -897,9 +897,12 @@ export async function getClientDashboardStats(): Promise<ClientDashboardStats> {
   }
 
   priorityTickets.forEach((ticket: { priority: TicketPriority }) => {
-    const priority = ticket.priority.toLowerCase() as keyof typeof ticketsByPriority
-    if (priority in ticketsByPriority) {
-      ticketsByPriority[priority]++
+    if (isHighSeverity(ticket.priority)) {
+      ticketsByPriority.high++
+    } else if (ticket.priority === 'medium') {
+      ticketsByPriority.medium++
+    } else {
+      ticketsByPriority.low++
     }
   })
 
