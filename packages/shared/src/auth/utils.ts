@@ -16,7 +16,7 @@ export function isValidRole(role: string): role is UserRole {
 
 export function getUserRole(user: AuthUser | null): UserRole | null {
   if (!user) return null
-  return user.user_role // using root level for convenience
+  return user.app_metadata?.user_role || null // Access role from app_metadata
 }
 
 export function hasRole(user: AuthUser | null, role: UserRole): boolean {

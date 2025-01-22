@@ -25,24 +25,28 @@ This document outlines the files that need to be modified to switch from edge fu
    - Updated role checking logic using new utils
    - Removed hardcoded edge function URLs
 
-### Remaining Files to Update
-
+### ✅ Portal Page (DONE)
 4. `packages/shared/src/components/portal/PortalPage.tsx`
-   - Remove edge function verification in `verifyRole` useEffect
-   - Use metadata from auth user object (`user.app_metadata.user_role`)
-   - Update role verification logic using new utils
-   - Remove hardcoded edge function URLs
+   - Removed edge function verification in `verifyRole` useEffect
+   - Using metadata from auth user object
+   - Updated role verification logic using new utils
+   - Removed hardcoded edge function URLs
 
-5. `apps/client/src/app/client/auth/callback/route.ts`
-   - Remove edge function call
-   - Use `session.user.app_metadata.user_role` for role check
-   - Update role verification logic
-   - Remove hardcoded edge function URLs
+### ✅ Client App (DONE)
+5. `apps/client/src/app/auth/callback/route.ts`
+   - Removed edge function call
+   - Using `session.user.app_metadata.user_role` for role check
+   - Updated role verification logic
+   - Removed hardcoded edge function URLs
+   - ✅ Removed redundant callback route in `/app/client/auth/callback`
 
-6. `apps/client/src/app/auth/callback/route.ts`
-   - Similar changes as above for the main auth callback
-   - Remove edge function calls
-   - Use metadata directly from session
+6. `apps/client/src/app/client-portal/layout.tsx`
+   - Removed edge function call
+   - Using `hasRequiredRole` utility
+   - Simplified role verification to be synchronous
+   - Removed Supabase client dependency
+
+### Remaining Files to Update
 
 7. `apps/agent/src/app/agent-portal/layout.tsx`
    - Remove `supabase.functions.invoke('check-role')`

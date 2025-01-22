@@ -1,6 +1,7 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { AuthUser } from 'shared/src/auth/types'
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
@@ -23,24 +24,14 @@ export async function GET(request: Request) {
         return NextResponse.redirect(new URL('/auth/login?error=no_session', requestUrl.origin))
       }
 
-      // Check user role using edge function
-      const roleResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/check-role`, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
-      })
+      // Get user role from JWT claims
+      const user = session.user as AuthUser
+      const userRole = user.user_role // using root level for convenience
 
-      if (!roleResponse.ok) {
-        const errorText = await roleResponse.text()
-        console.error('Edge function error:', errorText)
-        return NextResponse.redirect(new URL('/auth/login?error=role', requestUrl.origin))
-      }
-      
-      const { role } = await roleResponse.json()
-      console.log('Edge Function returned role:', role)
+      console.log('User role from JWT:', userRole)
 
-      if (role !== 'client') {
-        console.error('User is not a client:', role)
+      if (userRole !== 'client') {
+        console.error('User is not a client:', userRole)
         await supabase.auth.signOut()
         return NextResponse.redirect(new URL('/auth/login?error=unauthorized', requestUrl.origin))
       }

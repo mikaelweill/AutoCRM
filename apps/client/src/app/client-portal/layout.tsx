@@ -4,7 +4,7 @@ import { Navigation } from "shared/src/components/Navigation"
 import { useAuth } from "shared/src/contexts/AuthContext"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { createClient } from 'shared/src/lib/supabase'
+import { hasRequiredRole } from "shared/src/auth/utils"
 
 const clientNavLinks = [
   { href: '/client-portal', label: 'Dashboard' },
@@ -22,7 +22,6 @@ export default function ClientLayout({
   const router = useRouter()
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
-  const supabase = createClient()
 
   useEffect(() => {
     if (loading) return
@@ -31,28 +30,20 @@ export default function ClientLayout({
       return
     }
 
-    const checkRole = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('check-role')
-        
-        if (error) throw error
-        
-        if (!data.isClient) {
-          router.replace('/unauthorized')
-          return
-        }
-
-        setIsAuthorized(true)
-      } catch (error) {
-        console.error('Error checking role:', error)
+    try {
+      if (!hasRequiredRole(user, 'client')) {
         router.replace('/unauthorized')
-      } finally {
-        setIsChecking(false)
+        return
       }
-    }
 
-    checkRole()
-  }, [user, loading, router, supabase.functions])
+      setIsAuthorized(true)
+    } catch (error) {
+      console.error('Error checking role:', error)
+      router.replace('/unauthorized')
+    } finally {
+      setIsChecking(false)
+    }
+  }, [user, loading, router])
 
   // Show nothing while checking
   if (loading || isChecking) {
