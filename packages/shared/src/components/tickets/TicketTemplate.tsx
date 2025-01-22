@@ -43,23 +43,21 @@ const DefaultMetadata = ({ ticket }: { ticket: Ticket }) => (
       <UserCircle className="w-4 h-4" />
       <span>Created by: {ticket.client.full_name || ticket.client.email || 'Unknown'}</span>
     </div>
+    <div className="flex items-center gap-2">
+      <Clock className="w-4 h-4" />
+      <span>Created date: {new Date(ticket.created_at).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })}</span>
+    </div>
     {ticket.agent_id && (
       <div className="flex items-center gap-2">
         <UserCircle className="w-4 h-4" />
         <span>Assigned to: {ticket.agent?.full_name || ticket.agent?.email || 'Unknown'}</span>
       </div>
     )}
-    <div className="flex items-center gap-2">
-      <Clock className="w-4 h-4" />
-      <span>
-        {new Date(ticket.created_at).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        })}
-      </span>
-    </div>
   </div>
 )
 
@@ -216,14 +214,12 @@ export function TicketTemplate({
           {renderHeader(ticket)}
         </div>
 
-        {/* Metadata Section */}
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50">
-          {renderMetadata(ticket)}
-        </div>
+        {/* Divider */}
+        <div className="border-t border-gray-100" />
 
         {/* Attachments Section */}
         {!hideAttachments && ticket.attachments && ticket.attachments.length > 0 && (
-          <div className="px-6 py-3 border-t border-gray-100">
+          <div className="px-6 py-3">
             <span className="text-gray-700 text-sm">Attachments:</span>
             <div className="flex flex-wrap gap-2 mt-2">
               {ticket.attachments.map((attachment) => (
@@ -247,6 +243,11 @@ export function TicketTemplate({
           </div>
         )}
 
+        {/* Metadata Section */}
+        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+          {renderMetadata(ticket)}
+        </div>
+
         {/* Comments Section - Only shown in detail view */}
         {isDetailView && (
           <div className="px-6 py-4 border-t border-gray-100">
@@ -257,6 +258,9 @@ export function TicketTemplate({
         {/* Footer Section */}
         <div className="px-6 py-4 border-t border-gray-100 bg-gradient-to-b from-gray-50/50 to-gray-100/50 rounded-b-lg flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500">
+              ID {ticket.number}
+            </span>
             <span
               className={`${
                 TICKET_STATUSES.find((s) => s.value === ticket.status)?.color || 'bg-gray-100 text-gray-800'
@@ -270,9 +274,6 @@ export function TicketTemplate({
               } px-2.5 py-0.5 rounded-full text-sm font-medium`}
             >
               {TICKET_PRIORITIES.find(p => p.value === ticket.priority)?.label || ticket.priority}
-            </span>
-            <span className="text-sm text-gray-500">
-              ID {ticket.number}
             </span>
           </div>
           
