@@ -84,6 +84,10 @@ export function AuthProvider({ children, appType }: AuthProviderProps) {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         if (sessionError) throw sessionError
         
+        if (session?.access_token) {
+          console.log('JWT Claims:', JSON.parse(atob(session.access_token.split('.')[1])))
+        }
+        
         setUser(session?.user ?? null)
         if (session?.user) {
           redirectBasedOnRole(session.access_token)

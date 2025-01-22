@@ -10,7 +10,9 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "clean": "turbo run clean && rm -rf node_modules",
+    "build-all": "turbo run build",
+    "start-all": "turbo run start --parallel"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.18",
