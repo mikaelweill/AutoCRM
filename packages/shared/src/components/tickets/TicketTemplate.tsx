@@ -22,6 +22,8 @@ interface TicketTemplateProps {
   // Optional flags
   hideDescription?: boolean
   hideAttachments?: boolean
+  hideComments?: boolean
+  readOnlyComments?: boolean
   isDetailView?: boolean
 }
 
@@ -71,7 +73,7 @@ interface Comment {
   }
 }
 
-const CommentSection = ({ ticket }: { ticket: Ticket }) => {
+const CommentSection = ({ ticket, readOnly }: { ticket: Ticket; readOnly?: boolean }) => {
   const [newComment, setNewComment] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [comments, setComments] = useState<TicketActivity[]>([])
@@ -170,22 +172,29 @@ const CommentSection = ({ ticket }: { ticket: Ticket }) => {
         ))}
       </div>
 
-      {/* New Comment Form */}
-      <div className="flex gap-2">
-        <textarea
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          placeholder="Add a comment..."
-          className="flex-1 min-h-[80px] p-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <Button 
-          onClick={handleSubmit}
-          disabled={!newComment.trim() || isSubmitting}
-          className="self-end"
-        >
-          <Send className="w-4 h-4" />
-        </Button>
-      </div>
+      {/* New Comment Form - Only show if not read-only */}
+      {!readOnly && (
+        <div className="flex gap-2">
+          <textarea
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Add a comment..."
+            className="flex-1 min-h-[80px] p-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <Button 
+            onClick={handleSubmit}
+            disabled={!newComment.trim() || isSubmitting}
+            className="self-end"
+          >
+            <Send className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
+      {readOnly && (
+        <div className="text-sm text-gray-500 italic border rounded-lg p-3 bg-gray-50">
+          Claim this ticket to add comments
+        </div>
+      )}
     </div>
   )
 }
@@ -199,6 +208,8 @@ export function TicketTemplate({
   renderActions,
   hideDescription = false,
   hideAttachments = false,
+  hideComments = false,
+  readOnlyComments = false,
   isDetailView = false,
 }: TicketTemplateProps) {
   const priorityColor = TICKET_PRIORITIES.find(p => p.value === ticket.priority)?.color || 'gray'
@@ -248,10 +259,10 @@ export function TicketTemplate({
           {renderMetadata(ticket)}
         </div>
 
-        {/* Comments Section - Only shown in detail view */}
-        {isDetailView && (
+        {/* Comments Section */}
+        {isDetailView && !hideComments && (
           <div className="px-6 py-4 border-t border-gray-100">
-            <CommentSection ticket={ticket} />
+            <CommentSection ticket={ticket} readOnly={readOnlyComments} />
           </div>
         )}
 
@@ -276,13 +287,7 @@ export function TicketTemplate({
               {TICKET_PRIORITIES.find(p => p.value === ticket.priority)?.label || ticket.priority}
             </span>
           </div>
-          
-          {/* Actions Section */}
-          {renderActions && (
-            <div>
-              {renderActions(ticket)}
-            </div>
-          )}
+          {renderActions && renderActions(ticket)}
         </div>
       </div>
     </div>

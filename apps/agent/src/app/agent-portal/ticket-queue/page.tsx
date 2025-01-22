@@ -138,12 +138,14 @@ export default function TicketQueuePage() {
                 ticket={ticket}
                 onTicketClick={() => setSelectedTicket(ticket)}
                 getAttachmentUrl={getAttachmentUrl}
+                readOnlyComments={true}
                 renderActions={ticket => (
                   <Button
                     onClick={(e) => {
                       e.stopPropagation()
                       handleAssign(ticket.id)
                     }}
+                    className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200"
                   >
                     Claim
                   </Button>
@@ -163,9 +165,11 @@ export default function TicketQueuePage() {
               ticket={selectedTicket}
               getAttachmentUrl={getAttachmentUrl}
               isDetailView={true}
+              readOnlyComments={true}
               renderActions={ticket => (
                 <Button
                   onClick={() => handleAssign(ticket.id)}
+                  className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200"
                 >
                   Claim
                 </Button>

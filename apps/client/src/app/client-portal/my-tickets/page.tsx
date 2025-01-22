@@ -144,10 +144,10 @@ export default function MyTicketsPage() {
                 renderActions={ticket => ticket.status !== 'cancelled' && (
                   <Button
                     onClick={(e) => {
-                      e.stopPropagation() // Prevent opening modal when clicking cancel
+                      e.stopPropagation()
                       handleCancelTicket(ticket.id)
                     }}
-                    variant="danger"
+                    className="bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200"
                     disabled={isCancelling === ticket.id}
                   >
                     {isCancelling === ticket.id ? 'Cancelling...' : 'Cancel'}
@@ -182,7 +182,7 @@ export default function MyTicketsPage() {
               renderActions={ticket => ticket.status !== 'cancelled' && (
                 <Button
                   onClick={() => handleCancelTicket(ticket.id)}
-                  variant="danger"
+                  className="bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200"
                   disabled={isCancelling === ticket.id}
                 >
                   {isCancelling === ticket.id ? 'Cancelling...' : 'Cancel'}
