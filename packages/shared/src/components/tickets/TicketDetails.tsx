@@ -148,8 +148,9 @@ export function TicketDetails({
     }
   }
 
-  // Check if current user is the assigned agent
+  // Check if current user is the assigned agent or the ticket owner (client)
   const isAssignedAgent = currentUser && ticket.agent_id === currentUser.id
+  const isTicketOwner = currentUser && ticket.client_id === currentUser.id
 
   return (
     <div className="space-y-6">
@@ -201,8 +202,8 @@ export function TicketDetails({
         </div>
       )}
 
-      {/* Activities/Replies */}
-      <div className="border-t pt-4">
+      {/* Activity/Replies Section */}
+      <div className="mt-6">
         <h4 className="text-sm font-medium text-gray-700 mb-4">Replies</h4>
         <div className="space-y-4">
           {activities.map((activity) => (
@@ -222,8 +223,8 @@ export function TicketDetails({
           ))}
         </div>
 
-        {/* Reply Form - Only show if user is assigned agent */}
-        {isAssignedAgent ? (
+        {/* Reply Form - Show if user is assigned agent or ticket owner */}
+        {(isAssignedAgent || isTicketOwner) ? (
           <form onSubmit={handleSubmitReply} className="mt-4">
             <Textarea
               value={replyContent}
@@ -240,7 +241,7 @@ export function TicketDetails({
               >
                 Add Reply
               </Button>
-              {onCancel && ticket.status !== 'cancelled' && (
+              {onCancel && ticket.status !== 'cancelled' && isTicketOwner && (
                 <Button
                   type="button"
                   variant="danger"
@@ -254,11 +255,11 @@ export function TicketDetails({
             </div>
           </form>
         ) : (
-          // Show assign button if ticket is unassigned
+          // Show assign button if ticket is unassigned and user is an agent
           !ticket.agent_id && onAssign && (
             <div className="mt-4 flex justify-center">
               <Button onClick={() => onAssign(ticket.id)}>
-                Assign to Me to Reply
+                Claim to Reply
               </Button>
             </div>
           )

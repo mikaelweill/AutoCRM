@@ -117,80 +117,76 @@ export function MyTickets() {
             className="bg-white shadow rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
             onClick={() => setSelectedTicket(ticket)}
           >
-            <div className="flex justify-between items-start">
-              <div>
+            <div className="flex flex-col">
+              <div className="flex items-start justify-between">
                 <h3 className="font-medium">
                   #{ticket.number} - {ticket.subject}
                 </h3>
-                <div className="mt-1 text-sm text-gray-500">
-                  From: {ticket.client?.full_name || ticket.client?.email || 'Unknown'}
-                </div>
-                <div className="mt-2 space-x-2">
+                <div className="flex items-center gap-2 ml-4">
                   <span
-                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                    style={{ backgroundColor: priorityDetails?.color || '#e5e7eb' }}
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${priorityDetails?.color || 'bg-gray-100 text-gray-800'}`}
                   >
                     {priorityDetails?.label || ticket.priority}
                   </span>
                   <span
-                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                    style={{ backgroundColor: statusDetails?.color || '#e5e7eb' }}
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusDetails?.color || 'bg-gray-100 text-gray-800'}`}
                   >
                     {statusDetails?.label || ticket.status}
                   </span>
                 </div>
-                <p className="mt-2 text-sm text-gray-700">{ticket.description}</p>
-                {ticket.attachments && ticket.attachments.length > 0 && (
-                  <div className="mt-3 flex items-center gap-2">
-                    <span className="text-gray-700 text-sm">Attachments:</span>
-                    <div className="flex flex-wrap gap-2">
-                      {ticket.attachments.map((attachment) => (
-                        <a
-                          key={attachment.id}
-                          href={attachmentUrls[attachment.storage_path] || '#'}
-                          onClick={async (e) => {
-                            e.preventDefault()
-                            e.stopPropagation() // Prevent opening modal when clicking attachment
-                            window.open(
-                              await handleGetAttachmentUrl(attachment.storage_path),
-                              '_blank'
-                            )
-                          }}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-sm text-blue-600 hover:text-blue-700 hover:underline bg-blue-50 rounded"
-                        >
-                          {attachment.file_name}
-                        </a>
-                      ))}
-                    </div>
+              </div>
+              <div className="mt-1 text-sm text-gray-500">
+                From: {ticket.client?.full_name || ticket.client?.email || 'Unknown'}
+              </div>
+              <p className="mt-2 text-sm text-gray-700">{ticket.description}</p>
+              {ticket.attachments && ticket.attachments.length > 0 && (
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-gray-700 text-sm">Attachments:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {ticket.attachments.map((attachment) => (
+                      <a
+                        key={attachment.id}
+                        href={attachmentUrls[attachment.storage_path] || '#'}
+                        onClick={async (e) => {
+                          e.preventDefault()
+                          e.stopPropagation() // Prevent opening modal when clicking attachment
+                          window.open(
+                            await handleGetAttachmentUrl(attachment.storage_path),
+                            '_blank'
+                          )
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-sm text-blue-600 hover:text-blue-700 hover:underline bg-blue-50 rounded"
+                      >
+                        {attachment.file_name}
+                      </a>
+                    ))}
                   </div>
-                )}
-              </div>
-              <div className="flex gap-2 ml-4">
-                {ticket.status !== 'closed' && (
-                  <>
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation() // Prevent opening modal when clicking unassign
-                        handleUnassign(ticket.id)
-                      }}
-                      variant="secondary"
-                      loading={isUnassigning === ticket.id}
-                    >
-                      Unassign
-                    </Button>
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation() // Prevent opening modal when clicking close
-                        handleClose(ticket.id)
-                      }}
-                      variant="secondary"
-                      loading={isClosing === ticket.id}
-                    >
-                      Close Ticket
-                    </Button>
-                  </>
-                )}
-              </div>
+                </div>
+              )}
+              {ticket.status !== 'closed' && (
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation() // Prevent opening modal when clicking unassign
+                      handleUnassign(ticket.id)
+                    }}
+                    variant="secondary"
+                    loading={isUnassigning === ticket.id}
+                  >
+                    Unclaim
+                  </Button>
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation() // Prevent opening modal when clicking close
+                      handleClose(ticket.id)
+                    }}
+                    variant="secondary"
+                    loading={isClosing === ticket.id}
+                  >
+                    Close
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         )

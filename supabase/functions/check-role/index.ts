@@ -25,8 +25,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       {
         auth: {
-          autoRefreshToken: false,
-          persistSession: false
+          autoRefreshToken: true,
+          persistSession: true
         }
       }
     )

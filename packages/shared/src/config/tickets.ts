@@ -11,28 +11,28 @@ export const TICKET_PRIORITIES: {
   { 
     value: 'low',
     label: 'Low',
-    color: 'bg-green-50 border-green-200 text-green-700',
+    color: 'bg-green-100 text-green-800',
     badgeColor: 'bg-green-100 text-green-800',
     description: 'Minor issues, no immediate impact'
   },
   { 
     value: 'medium',
     label: 'Medium',
-    color: 'bg-yellow-50 border-yellow-200 text-yellow-700',
+    color: 'bg-yellow-100 text-yellow-800',
     badgeColor: 'bg-yellow-100 text-yellow-800',
     description: 'Important issues requiring attention'
   },
   { 
     value: 'high',
     label: 'High',
-    color: 'bg-red-50 border-red-200 text-red-700',
+    color: 'bg-red-100 text-red-800',
     badgeColor: 'bg-red-100 text-red-800',
     description: 'Critical issues needing quick resolution'
   },
   { 
     value: 'urgent',
     label: 'Urgent',
-    color: 'bg-purple-50 border-purple-200 text-purple-700',
+    color: 'bg-purple-100 text-purple-800',
     badgeColor: 'bg-purple-100 text-purple-800',
     description: 'Emergency issues requiring immediate action'
   }

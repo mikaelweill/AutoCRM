@@ -136,25 +136,25 @@ export function TicketQueue() {
           >
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="font-medium">
-                  #{ticket.number} - {ticket.subject}
-                </h3>
+                <div className="flex items-start justify-between">
+                  <h3 className="font-medium">
+                    #{ticket.number} - {ticket.subject}
+                  </h3>
+                  <div className="flex items-center gap-2 ml-4">
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${priorityDetails?.color || 'bg-gray-100 text-gray-800'}`}
+                    >
+                      {priorityDetails?.label || ticket.priority}
+                    </span>
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusDetails?.color || 'bg-gray-100 text-gray-800'}`}
+                    >
+                      {statusDetails?.label || ticket.status}
+                    </span>
+                  </div>
+                </div>
                 <div className="mt-1 text-sm text-gray-500">
                   From: {ticket.client?.full_name || ticket.client?.email || 'Unknown'}
-                </div>
-                <div className="mt-2 space-x-2">
-                  <span
-                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                    style={{ backgroundColor: priorityDetails?.color || '#e5e7eb' }}
-                  >
-                    {priorityDetails?.label || ticket.priority}
-                  </span>
-                  <span
-                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                    style={{ backgroundColor: statusDetails?.color || '#e5e7eb' }}
-                  >
-                    {statusDetails?.label || ticket.status}
-                  </span>
                 </div>
                 <p className="mt-2 text-sm text-gray-700">{ticket.description}</p>
                 {ticket.attachments && ticket.attachments.length > 0 && (
@@ -182,14 +182,15 @@ export function TicketQueue() {
                   </div>
                 )}
               </div>
+            </div>
+            <div className="flex justify-end mt-4">
               <Button
                 onClick={(e) => {
                   e.stopPropagation() // Prevent opening modal when clicking assign
                   handleAssign(ticket.id)
                 }}
-                className="ml-4"
               >
-                Assign to Me
+                Claim
               </Button>
             </div>
           </div>

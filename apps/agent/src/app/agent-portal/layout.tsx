@@ -8,7 +8,6 @@ import { createClient } from 'shared/src/lib/supabase'
 
 const agentNavLinks = [
   { href: '/agent-portal', label: 'Dashboard' },
-  { href: '/agent-portal/all-tickets', label: 'All Tickets' },
   { href: '/agent-portal/ticket-queue', label: 'Ticket Queue' },
   { href: '/agent-portal/my-tickets', label: 'My Tickets' }
 ]
@@ -54,21 +53,21 @@ export default function AgentLayout({
     checkRole()
   }, [user, loading, router, supabase.functions])
 
-  // Show nothing while checking
-  if (loading || isChecking) {
-    return null
-  }
-
-  // Show nothing if not authorized
-  if (!isAuthorized) {
-    return null
-  }
-
   return (
     <div className="h-screen flex">
       <Navigation links={agentNavLinks} title="Agent Portal" />
       <main className="flex-1 overflow-auto">
-        {children}
+        {loading || isChecking ? (
+          <div className="p-8 flex items-center justify-center">
+            <div className="text-gray-500">Loading...</div>
+          </div>
+        ) : !isAuthorized ? (
+          <div className="p-8 flex items-center justify-center">
+            <div className="text-gray-500">Checking authorization...</div>
+          </div>
+        ) : (
+          children
+        )}
       </main>
     </div>
   )
