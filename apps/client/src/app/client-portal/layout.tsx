@@ -8,7 +8,7 @@ import { createClient } from 'shared/src/lib/supabase'
 
 const clientNavLinks = [
   { href: '/client-portal', label: 'Dashboard' },
-  { href: '/client-portal/tickets', label: 'My Tickets' },
+  { href: '/client-portal/my-tickets', label: 'My Tickets' },
   { href: '/client-portal/knowledge-base', label: 'Knowledge Base' },
   { href: '/client-portal/reports', label: 'Reports' }
 ]
