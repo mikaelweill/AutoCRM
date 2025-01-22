@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '../../contexts/AuthContext'
-import { createClient } from '../../lib/supabase'
+import { UserRole } from '../../auth/types'
+import { hasRequiredRole } from '../../auth/utils'
 
 interface PortalPageProps {
   children?: React.ReactNode
-  requiredRole: 'client' | 'agent' | 'admin'
+  requiredRole: UserRole
   title?: string
 }
 
@@ -15,10 +16,9 @@ export function PortalPage({ children, requiredRole, title }: PortalPageProps) {
   const { user, loading } = useAuth()
   const router = useRouter()
   const [roleVerified, setRoleVerified] = useState(false)
-  const supabase = createClient()
 
   useEffect(() => {
-    const verifyRole = async () => {
+    const verifyRole = () => {
       if (!user) {
         console.log('No authenticated user found in portal, redirecting to login')
         router.push('/auth/login')
@@ -26,33 +26,7 @@ export function PortalPage({ children, requiredRole, title }: PortalPageProps) {
       }
 
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) {
-          console.log('No session found, redirecting to login')
-          router.push('/auth/login')
-          return
-        }
-
-        const response = await fetch('https://nkicqyftdkfphifgvejh.supabase.co/functions/v1/check-role', {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-          }
-        })
-
-        if (!response.ok) {
-          console.error('Failed to verify role')
-          router.push('/auth/login')
-          return
-        }
-
-        const roleData = await response.json()
-        const hasRequiredRole = 
-          (requiredRole === 'client' && roleData.isClient) ||
-          (requiredRole === 'agent' && roleData.isAgent) ||
-          (requiredRole === 'admin' && roleData.isAdmin)
-
-        if (!hasRequiredRole) {
+        if (!hasRequiredRole(user, requiredRole)) {
           console.error('User does not have required role:', requiredRole)
           router.push('/auth/login?error=unauthorized')
           return
@@ -68,7 +42,7 @@ export function PortalPage({ children, requiredRole, title }: PortalPageProps) {
     if (!loading && user) {
       verifyRole()
     }
-  }, [user, loading, router, requiredRole, supabase.auth])
+  }, [user, loading, router, requiredRole])
 
   if (loading || (user && !roleVerified)) {
     return (

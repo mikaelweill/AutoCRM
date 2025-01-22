@@ -4,9 +4,11 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { User } from '@supabase/supabase-js'
 import { createClient } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
+import { hasRequiredRole } from '../auth/utils'
+import { AuthUser } from '../auth/types'
 
 type AuthContextType = {
-  user: User | null
+  user: AuthUser | null
   loading: boolean
   signOut: () => Promise<void>
 }
@@ -25,37 +27,16 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children, appType }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
   const router = useRouter()
 
-  const redirectBasedOnRole = async (accessToken: string) => {
+  const redirectBasedOnRole = (user: AuthUser) => {
     try {
-      const response = await fetch('https://nkicqyftdkfphifgvejh.supabase.co/functions/v1/check-role', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-        }
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Edge function error:', errorText)
-        throw new Error('Failed to check role')
-      }
-      
-      const roleData = await response.json()
-      console.log('Role check response:', roleData)
-
-      const hasRequiredRole = 
-        (appType === 'client' && roleData.isClient) ||
-        (appType === 'agent' && roleData.isAgent) ||
-        (appType === 'admin' && roleData.isAdmin)
-
-      if (!hasRequiredRole) {
+      if (!hasRequiredRole(user, appType)) {
         console.error('User does not have required role:', appType)
-        await supabase.auth.signOut()
+        supabase.auth.signOut()
         router.push('/auth/login?error=unauthorized')
         return
       }
@@ -88,18 +69,20 @@ export function AuthProvider({ children, appType }: AuthProviderProps) {
           console.log('JWT Claims:', JSON.parse(atob(session.access_token.split('.')[1])))
         }
         
-        setUser(session?.user ?? null)
-        if (session?.user) {
-          redirectBasedOnRole(session.access_token)
+        const authUser = session?.user as AuthUser | null
+        setUser(authUser)
+        if (authUser) {
+          redirectBasedOnRole(authUser)
         }
         
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, session) => {
             console.log('Auth state changed:', event, session?.user)
-            setUser(session?.user ?? null)
+            const authUser = session?.user as AuthUser | null
+            setUser(authUser)
             
-            if (event === 'SIGNED_IN' && session?.user) {
-              redirectBasedOnRole(session.access_token)
+            if (event === 'SIGNED_IN' && authUser) {
+              redirectBasedOnRole(authUser)
             } else if (event === 'SIGNED_OUT') {
               router.push('/auth/login')
             }
