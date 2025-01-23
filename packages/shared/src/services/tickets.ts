@@ -954,7 +954,7 @@ export async function getUnassignedTickets(): Promise<Ticket[]> {
       )
     `)
     .is('agent_id', null)
-    .eq('status', 'new')
+    .in('status', ['new', 'cancelled'])
     .order('created_at', { ascending: false })
 
   if (error) {
