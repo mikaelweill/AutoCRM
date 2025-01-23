@@ -298,14 +298,14 @@ export function TicketTemplate({
           </div>
         )}
 
-        {/* Comments Section - Moved up */}
+        {/* Comments Section */}
         {isDetailView && !hideComments && (
           <div className="px-6 py-4 border-t border-gray-100">
             <CommentSection ticket={ticket} readOnly={readOnlyComments} />
           </div>
         )}
 
-        {/* Metadata Section - Moved down */}
+        {/* Metadata Section */}
         <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50">
           {renderMetadata(ticket)}
         </div>

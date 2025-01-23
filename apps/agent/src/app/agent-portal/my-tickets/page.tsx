@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from 'shared/src/lib/supabase'
-import { Ticket } from 'shared/src/services/tickets'
+import { Ticket, getMyTickets } from 'shared/src/services/tickets'
 import { Button } from 'shared/src/components/ui'
 import { Dialog } from 'shared/src/components/ui/Dialog'
 import { TicketTemplate, ActionButton } from 'shared/src/components/tickets/TicketTemplate'
@@ -22,24 +22,9 @@ export default function MyTicketsPage() {
     // Initial fetch of my tickets
     async function fetchMyTickets() {
       try {
-        const user = await supabase.auth.getUser()
-        if (!user.data.user?.id) {
-          throw new Error('No user found')
-        }
-
-        const { data, error } = await supabase
-          .from('tickets')
-          .select(`
-            *,
-            client:client_id(id, email, full_name, role),
-            agent:agent_id(id, email, full_name, role),
-            attachments(*)
-          `)
-          .eq('agent_id', user.data.user.id)
-          .order('created_at', { ascending: false })
-
-        if (error) throw error
-        setTickets(data as unknown as Ticket[])
+        const data = await getMyTickets()
+        setTickets(data)
+        setError(null)
       } catch (err) {
         console.error('Error fetching tickets:', err)
         setError('Failed to load tickets')

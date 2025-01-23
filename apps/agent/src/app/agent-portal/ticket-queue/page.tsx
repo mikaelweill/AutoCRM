@@ -2,17 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from 'shared/src/lib/supabase'
-import { Database } from 'shared/src/types/database'
+import { Ticket, getUnassignedTickets, assignTicket } from 'shared/src/services/tickets'
 import { Button } from 'shared/src/components/ui'
 import { Dialog } from 'shared/src/components/ui/Dialog'
 import { TicketTemplate, ActionButton } from 'shared/src/components/tickets/TicketTemplate'
-
-type Ticket = Database['public']['Tables']['tickets']['Row'] & {
-  client: Database['public']['Tables']['users']['Row']
-  agent: Database['public']['Tables']['users']['Row'] | null
-  attachments: Array<Database['public']['Tables']['attachments']['Row']>
-  metadata: Record<string, any>
-}
 
 export default function TicketQueuePage() {
   const [tickets, setTickets] = useState<Ticket[]>([])
@@ -20,6 +13,7 @@ export default function TicketQueuePage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({})
+  const [isAssigning, setIsAssigning] = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -27,20 +21,9 @@ export default function TicketQueuePage() {
     // Initial fetch of unassigned tickets
     async function fetchUnassignedTickets() {
       try {
-        const { data, error } = await supabase
-          .from('tickets')
-          .select(`
-            *,
-            client:client_id(id, email, full_name, role),
-            agent:agent_id(id, email, full_name, role),
-            attachments(*)
-          `)
-          .is('agent_id', null)
-          .eq('status', 'new')
-          .order('created_at', { ascending: false })
-
-        if (error) throw error
-        setTickets(data as any)
+        const data = await getUnassignedTickets()
+        setTickets(data)
+        setError(null)
       } catch (err) {
         console.error('Error fetching tickets:', err)
         setError('Failed to load tickets')
@@ -73,21 +56,16 @@ export default function TicketQueuePage() {
   }, [])
 
   const handleAssign = async (ticketId: string) => {
-    const supabase = createClient()
     try {
-      const { error } = await supabase
-        .from('tickets')
-        .update({ 
-          agent_id: (await supabase.auth.getUser()).data.user?.id,
-          status: 'in_progress'
-        })
-        .eq('id', ticketId)
-      
-      if (error) throw error
+      setIsAssigning(ticketId)
+      await assignTicket(ticketId)
       setSelectedTicket(null)
+      setError(null)
     } catch (err) {
       console.error('Error assigning ticket:', err)
       setError('Failed to assign ticket')
+    } finally {
+      setIsAssigning(null)
     }
   }
 
@@ -145,8 +123,9 @@ export default function TicketQueuePage() {
                       e.stopPropagation()
                       handleAssign(ticket.id)
                     }}
+                    loading={isAssigning === ticket.id}
                   >
-                    Claim
+                    {isAssigning === ticket.id ? 'Claiming...' : 'Claim'}
                   </ActionButton.claim>
                 )}
               />
@@ -168,8 +147,9 @@ export default function TicketQueuePage() {
               renderActions={ticket => (
                 <ActionButton.claim
                   onClick={() => handleAssign(ticket.id)}
+                  loading={isAssigning === ticket.id}
                 >
-                  Claim
+                  {isAssigning === ticket.id ? 'Claiming...' : 'Claim'}
                 </ActionButton.claim>
               )}
             />

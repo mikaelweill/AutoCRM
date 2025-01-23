@@ -48,6 +48,7 @@ export interface Ticket {
   agent_id: string | null
   created_at: string
   updated_at: string
+  resolved_at: string | null
   activities?: TicketActivity[]
   client: User
   agent?: User
@@ -125,22 +126,25 @@ function isTicket(data: unknown): data is Ticket {
     typeof ticket.client_id === 'string' &&
     typeof ticket.created_at === 'string' &&
     typeof ticket.updated_at === 'string' &&
-    // Check nullable fields
+    // Check nullable/optional fields
     (ticket.agent_id === null || typeof ticket.agent_id === 'string') &&
+    (ticket.resolved_at === null || typeof ticket.resolved_at === 'string') &&
     // Check nested objects
     (typeof ticket.client === 'object' && ticket.client !== null &&
       typeof ticket.client.id === 'string' &&
       typeof ticket.client.email === 'string' &&
       typeof ticket.client.role === 'string') &&
-    // Agent can be null
-    (ticket.agent === undefined || (
-      typeof ticket.agent === 'object' && ticket.agent !== null &&
+    // Agent is optional
+    (ticket.agent === undefined || ticket.agent === null || (
+      typeof ticket.agent === 'object' &&
       typeof ticket.agent.id === 'string' &&
       typeof ticket.agent.email === 'string' &&
       typeof ticket.agent.role === 'string'
     )) &&
-    // Attachments are optional and can be an empty array
-    (!ticket.attachments || Array.isArray(ticket.attachments))
+    // Attachments are optional
+    (!ticket.attachments || Array.isArray(ticket.attachments)) &&
+    // Activities are optional
+    (!ticket.activities || Array.isArray(ticket.activities))
   )
 }
 
@@ -693,6 +697,13 @@ export async function getMyTickets(): Promise<Ticket[]> {
         file_size,
         storage_path,
         created_at
+      ),
+      activities:ticket_activities(
+        id,
+        activity_type,
+        content,
+        created_at,
+        user:users(id, email, full_name)
       )
     `)
     .eq('agent_id', user.id)
@@ -916,4 +927,53 @@ export async function getClientDashboardStats(): Promise<ClientDashboardStats> {
     averageResolutionHours,
     ticketsByPriority
   }
+}
+
+export async function getUnassignedTickets(): Promise<Ticket[]> {
+  const supabase = createClient()
+  
+  const { data: rawTickets, error } = await supabase
+    .from('tickets')
+    .select(`
+      *,
+      client:client_id(id, email, full_name, role),
+      agent:agent_id(id, email, full_name, role),
+      attachments(
+        id,
+        file_name,
+        file_type,
+        file_size,
+        storage_path,
+        created_at
+      ),
+      activities:ticket_activities(
+        id,
+        activity_type,
+        content,
+        created_at,
+        user:users(id, email, full_name)
+      )
+    `)
+    .is('agent_id', null)
+    .eq('status', 'new')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching tickets:', error)
+    throw new Error('Failed to fetch tickets')
+  }
+
+  // Cast through unknown first
+  const tickets = rawTickets as unknown
+  
+  // Now cast to an array and filter with type guard
+  const validTickets = (tickets as any[]).filter(ticket => {
+    const isValid = isTicket(ticket)
+    if (!isValid) {
+      console.warn('Invalid ticket data:', ticket)
+    }
+    return isValid
+  })
+
+  return validTickets
 } 
