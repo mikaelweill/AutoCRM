@@ -6,6 +6,7 @@ import { CreateTicketForm } from 'shared/src/components/tickets/CreateTicketForm
 import { ActionButton } from 'shared/src/components/tickets/TicketTemplate'
 import { TicketList } from 'shared/src/components/tickets/TicketList'
 import { Ticket, getTickets, cancelTicket, getAttachmentUrl } from 'shared/src/services/tickets'
+import { TICKET_PRIORITIES } from 'shared/src/config/tickets'
 
 export default function MyNewTicketsPage() {
   const { user } = useAuth()
@@ -73,6 +74,10 @@ export default function MyNewTicketsPage() {
       <div className="max-w-3xl mx-auto p-6">
         <TicketList
           tickets={tickets}
+          defaultFilters={{
+            statuses: ['new', 'in_progress'],
+            priorities: TICKET_PRIORITIES.map(p => p.value)
+          }}
           renderHeader={<h1 className="text-2xl font-semibold">My Tickets (New)</h1>}
           renderActions={ticket => (
             <ActionButton.cancel

@@ -1,8 +1,9 @@
 'use client'
 
+import React from 'react'
 import { useState, useEffect } from 'react'
 import { Ticket } from '../../services/tickets'
-import { TicketStatus, TicketPriority } from '../../config/tickets'
+import { TicketStatus, TicketPriority, TICKET_PRIORITIES } from '../../config/tickets'
 import { TicketTemplate } from './TicketTemplate'
 import { TicketFilters } from './TicketFilters'
 import { Dialog } from '../ui/Dialog'
@@ -21,7 +22,10 @@ interface TicketListProps {
   hideComments?: boolean
   hideAttachments?: boolean
   renderHeader?: React.ReactNode
-  renderCreateForm?: React.ReactNode
+  renderCreateForm?: React.ReactElement<{
+    onSuccess?: (ticketId: string) => void
+    onCancel?: () => void
+  }>
 }
 
 interface FilterState {
@@ -29,8 +33,6 @@ interface FilterState {
   priorities: TicketPriority[]
   searchTerm: string
 }
-
-const STORAGE_KEY = 'ticketFilters'
 
 export function TicketList({
   tickets,
@@ -47,29 +49,12 @@ export function TicketList({
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   
-  // Initialize filters from localStorage or defaults
-  const [filters, setFilters] = useState<FilterState>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) {
-        try {
-          return JSON.parse(saved)
-        } catch (e) {
-          console.warn('Failed to parse saved filters:', e)
-        }
-      }
-    }
-    return {
-      statuses: defaultFilters?.statuses || [],
-      priorities: defaultFilters?.priorities || [],
-      searchTerm: ''
-    }
+  // Initialize filters with defaults
+  const [filters, setFilters] = useState<FilterState>({
+    statuses: defaultFilters?.statuses || [],
+    priorities: defaultFilters?.priorities || TICKET_PRIORITIES.map(p => p.value),
+    searchTerm: ''
   })
-
-  // Save filters to localStorage when they change
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filters))
-  }, [filters])
 
   // Filter tickets based on current filters
   const filteredTickets = tickets.filter(ticket => {
@@ -162,7 +147,14 @@ export function TicketList({
           onClose={() => setIsCreateModalOpen(false)}
           title="Create New Ticket"
         >
-          {renderCreateForm}
+          {React.cloneElement(renderCreateForm, {
+            onCancel: () => setIsCreateModalOpen(false),
+            onSuccess: (ticketId: string) => {
+              setIsCreateModalOpen(false)
+              // @ts-ignore - we know these props exist on CreateTicketForm
+              renderCreateForm.props.onSuccess?.(ticketId)
+            }
+          })}
         </Dialog>
       )}
     </div>
