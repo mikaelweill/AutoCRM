@@ -143,7 +143,28 @@ serve(async (req: Request) => {
       )
     }
 
-    console.log('User created successfully:', { userId: user.id, role: invitation.role })
+    console.log('Auth user created successfully:', { userId: user.id, role: invitation.role, fullUser: user })
+
+    // Create corresponding record in public.users
+    const { error: publicUserError } = await supabaseAdmin
+      .from('users')
+      .insert({
+        id: user.user.id,
+        email: email,
+        role: invitation.role,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+
+    if (publicUserError) {
+      console.log('Error creating public user:', publicUserError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to create user record' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('Public user created successfully')
 
     // Mark invitation as used BEFORE returning success
     const { error: updateError } = await supabaseAdmin
