@@ -139,7 +139,7 @@ export function TicketList({
       <Dialog
         isOpen={selectedTicket !== null}
         onClose={() => setSelectedTicket(null)}
-        title={selectedTicket ? `Ticket #${selectedTicket.number}` : ''}
+        title={selectedTicket ? `Ticket ${selectedTicket.number}` : ''}
       >
         {selectedTicket && (
           <TicketTemplate
