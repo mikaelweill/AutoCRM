@@ -97,7 +97,10 @@ export default function MyNewTicketsPage() {
             if (ticket.status === 'closed' || ticket.status === 'cancelled') {
               return (
                 <ActionButton.reopen
-                  onClick={() => handleReopenTicket(ticket.id)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleReopenTicket(ticket.id)
+                  }}
                   loading={isReopening === ticket.id}
                 >
                   {isReopening === ticket.id ? 'Reopening...' : 'Reopen'}
@@ -106,7 +109,10 @@ export default function MyNewTicketsPage() {
             }
             return (
               <ActionButton.cancel
-                onClick={() => handleCancelTicket(ticket.id)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleCancelTicket(ticket.id)
+                }}
                 loading={isCancelling === ticket.id}
               >
                 {isCancelling === ticket.id ? 'Cancelling...' : 'Cancel'}
