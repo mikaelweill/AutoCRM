@@ -1,7 +1,7 @@
 'use client'
 
 import { createClient } from '../../lib/supabase'
-import { signUpWithToken } from '../../../../../shared/src/lib/api'
+import { signUpWithToken, signUpClient } from '../../lib/api'
 import { useEffect, useState } from 'react'
 import { AuthChangeEvent, Session } from '@supabase/supabase-js'
 
@@ -87,7 +87,7 @@ export function AuthForm({
           return
         }
 
-        // Use our new edge function for token signup
+        // Use edge function for token signup
         const result = await signUpWithToken(email, password, token)
         
         if (result.error) {
@@ -112,16 +112,13 @@ export function AuthForm({
         return
       }
 
-      // Regular signup (no token required)
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectTo || `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`
-        }
-      })
-
-      if (signUpError) throw signUpError
+      // Use edge function for client signup
+      const result = await signUpClient(email, password)
+      
+      if (result.error) {
+        setError(result.error)
+        return
+      }
 
       setError(null)
       setSuccess('Sign up successful! Please check your email for confirmation.')

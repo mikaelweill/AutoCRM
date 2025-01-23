@@ -28,13 +28,16 @@ export function hasRequiredRole(user: AuthUser | null, requiredRole: UserRole): 
   const userRole = getUserRole(user)
   if (!userRole) return false
 
-  switch (requiredRole) {
-    case 'client':
-      return userRole === 'client'
-    case 'agent':
-      return userRole === 'agent' || userRole === 'admin'
+  switch (userRole) {
     case 'admin':
-      return userRole === 'admin'
+      // Admin can access all portals
+      return true
+    case 'agent':
+      // Agent can access agent and client portals
+      return requiredRole === 'agent' || requiredRole === 'client'
+    case 'client':
+      // Client can only access client portal
+      return requiredRole === 'client'
     default:
       return false
   }

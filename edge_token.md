@@ -1,60 +1,50 @@
-# Secure Token Signup Implementation
-
-## Overview
-Implement secure token-based signup using Supabase Edge Functions. This ensures token validation and user creation happen server-side, preventing any client-side bypassing of the token requirement.
+# Token-Based Signup Implementation
 
 ## Progress
+- ✅ Created Edge Function for secure token-based signup
+- ✅ Added role validation based on portal URLs (localhost and production)
+- ✅ Implemented direct user creation in both `auth.users` and `public.users`
+- ✅ Added detailed logging for debugging
+- ✅ Removed database triggers in favor of Edge Function handling
+- ✅ Added CORS validation with proper origin checking
 
-### ✅ Security Decisions Made
-1. Using Edge Functions for secure token validation
-2. Removing RLS policies from invitations table
-   - Table completely locked down by default
-   - Only accessible via admin keys
-3. Password Security
-   - Sent securely over HTTPS
-   - Handled by Supabase's built-in security
-   - No need for client-side hashing
+## Current Issues
+- 🔄 Need to fix client signup to use Edge Function instead of direct auth
+- 🔄 Investigating invitation lookup issues (token/email matching)
+- 🔄 Adding more detailed logging for invitation validation
 
-### ✅ 1. Edge Function Created
-File: `supabase/functions/signup-with-token/index.ts`
-- ✅ Token validation
-- ✅ User creation with admin privileges
-- ✅ Invitation usage tracking
-- ⏳ Need to fix linter errors
+## Next Steps
+1. Modify client signup flow:
+   - Update client portal to use the Edge Function instead of direct auth
+   - Ensure consistent signup experience across all portals
+   - Add proper error handling and user feedback
 
-### ✅ 2. API Helper Created
-File: `shared/src/lib/api.ts`
-- ✅ Type-safe response interface
-- ✅ Error handling for edge function calls
-- ✅ Proper error messages and logging
-- ✅ Supabase client integration
+2. Improve invitation validation:
+   - Add case-insensitive email matching
+   - Better error messages for token/email mismatches
+   - Add logging to track invitation usage
 
-### 🔄 Next Steps
-3. Modify AuthForm
-4. Configuration & Deployment
+3. Security considerations:
+   - Validate token expiration
+   - Ensure atomic operations for invitation usage
+   - Maintain strict portal-role validation
 
-## Remaining Steps
+## Implementation Details
+- Edge Function handles all user creation
+- Role validation based on portal URL:
+  - localhost:3000 -> client
+  - localhost:3001 -> agent
+  - localhost:3002 -> admin
+  - auto-crm-{role}.vercel.app in production
+- Direct creation in both auth and public tables
+- No database triggers needed
 
-### 3. Modify AuthForm
-Update: `packages/shared/src/components/auth/AuthForm.tsx`
-```typescript
-// Replace current token validation flow:
-if (requireToken) {
-  const result = await signUpWithToken(email, password, token)
-  // Handle result
-} else {
-  // Regular signup remains unchanged
-  await supabase.auth.signUp(...)
-}
-```
-
-### 4. Configuration Steps
-1. Set up Supabase CLI if not done
-2. Configure edge function permissions
-3. Deploy function
-4. Test both flows:
-   - Regular signup (no token)
-   - Token-required signup
+## Testing Checklist
+- [ ] Test client signup with Edge Function
+- [ ] Verify role assignments
+- [ ] Check invitation validation
+- [ ] Test portal restrictions
+- [ ] Verify error messages
 
 ## Security Considerations
 - ✅ Token validation happens server-side
