@@ -3,7 +3,7 @@
 import React from 'react'
 import { Ticket, TicketActivity } from '../../services/tickets'
 import { TICKET_PRIORITIES, TICKET_STATUSES } from '../../config/tickets'
-import { UserCircle, Clock, Send } from 'lucide-react'
+import { UserCircle, Clock, Send, MessageCircle } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { useState, useEffect } from 'react'
 import { createClient } from '../../lib/supabase'
@@ -298,17 +298,17 @@ export function TicketTemplate({
           </div>
         )}
 
-        {/* Metadata Section */}
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50">
-          {renderMetadata(ticket)}
-        </div>
-
-        {/* Comments Section */}
+        {/* Comments Section - Moved up */}
         {isDetailView && !hideComments && (
           <div className="px-6 py-4 border-t border-gray-100">
             <CommentSection ticket={ticket} readOnly={readOnlyComments} />
           </div>
         )}
+
+        {/* Metadata Section - Moved down */}
+        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+          {renderMetadata(ticket)}
+        </div>
 
         {/* Footer Section */}
         <div className="px-6 py-4 border-t border-gray-100 bg-gradient-to-b from-gray-50/50 to-gray-100/50 rounded-b-lg flex items-center justify-between">
@@ -330,6 +330,12 @@ export function TicketTemplate({
             >
               {TICKET_PRIORITIES.find(p => p.value === ticket.priority)?.label || ticket.priority}
             </span>
+            {!isDetailView && ticket.activities && (
+              <span className="bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full text-sm font-medium flex items-center gap-1">
+                <MessageCircle className="w-3.5 h-3.5" />
+                {ticket.activities.filter(activity => activity.activity_type === 'comment').length}
+              </span>
+            )}
           </div>
           {renderActions && renderActions(ticket)}
         </div>

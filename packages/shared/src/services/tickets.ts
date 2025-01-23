@@ -48,9 +48,9 @@ export interface Ticket {
   agent_id: string | null
   created_at: string
   updated_at: string
-  resolved_at: string | null
+  activities?: TicketActivity[]
   client: User
-  agent: User | null
+  agent?: User
   attachments?: Attachment[]
 }
 
@@ -58,11 +58,10 @@ export interface TicketActivity {
   id: string
   ticket_id: string
   user_id: string
-  activity_type: 'comment' | 'status_change' | 'priority_change' | 'agent_assignment' | 'attachment_added'
   content: string
-  is_internal: boolean
+  activity_type: 'comment' | 'status_change' | 'assignment'
   created_at: string
-  user: Pick<User, 'id' | 'email' | 'full_name'>
+  user: User
 }
 
 export interface DashboardStats {
@@ -128,14 +127,13 @@ function isTicket(data: unknown): data is Ticket {
     typeof ticket.updated_at === 'string' &&
     // Check nullable fields
     (ticket.agent_id === null || typeof ticket.agent_id === 'string') &&
-    (ticket.resolved_at === null || typeof ticket.resolved_at === 'string') &&
     // Check nested objects
     (typeof ticket.client === 'object' && ticket.client !== null &&
       typeof ticket.client.id === 'string' &&
       typeof ticket.client.email === 'string' &&
       typeof ticket.client.role === 'string') &&
     // Agent can be null
-    (ticket.agent === null || (
+    (ticket.agent === undefined || (
       typeof ticket.agent === 'object' && ticket.agent !== null &&
       typeof ticket.agent.id === 'string' &&
       typeof ticket.agent.email === 'string' &&
@@ -258,6 +256,13 @@ export async function getTickets(): Promise<Ticket[]> {
         file_size,
         storage_path,
         created_at
+      ),
+      activities:ticket_activities(
+        id,
+        activity_type,
+        content,
+        created_at,
+        user:users(id, email, full_name)
       )
     `)
     .neq('status', 'cancelled')
@@ -610,7 +615,6 @@ export async function closeTicket(ticketId: string): Promise<Ticket> {
     .from('tickets')
     .update({ 
       status: 'closed',
-      resolved_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     })
     .eq('id', ticketId)
