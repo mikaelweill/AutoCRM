@@ -31,6 +31,20 @@ interface ActivityItem {
   content: string
   timestamp: string
   metadata: any
+  ticket: {
+    id: string
+    number: number
+    subject: string
+    client: {
+      name: string
+      email: string
+    }
+  }
+  user: {
+    name: string
+    email: string
+    role: string
+  }
 }
 
 export default function AdminPortal() {
@@ -67,56 +81,114 @@ export default function AdminPortal() {
   }
 
   async function fetchOverviewStats(): Promise<OverviewStats> {
-    // Get tickets count by status
+    // Get tickets with their associated users
     const { data: tickets, error: ticketsError } = await supabase
       .from('tickets')
-      .select('status')
+      .select(`
+        status,
+        client_id,
+        agent_id
+      `)
     
     if (ticketsError) throw ticketsError
 
-    // Get active users count
-    const { data: users, error: usersError } = await supabase
-      .from('users')
-      .select('role, last_seen')
-      .gte('last_seen', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+    const initialStatus = {
+      new: 0,
+      in_progress: 0,
+      closed: 0,
+      cancelled: 0
+    }
 
-    if (usersError) throw usersError
-
-    const ticketsByStatus = tickets.reduce((acc: any, ticket) => {
-      acc[ticket.status] = (acc[ticket.status] || 0) + 1
+    const ticketsByStatus = tickets.reduce((acc, ticket: any) => {
+      if (ticket.status) {
+        acc[ticket.status as keyof typeof initialStatus] = 
+          (acc[ticket.status as keyof typeof initialStatus] || 0) + 1
+      }
       return acc
-    }, { new: 0, in_progress: 0, closed: 0, cancelled: 0 })
+    }, {...initialStatus})
+
+    // Get unique active agents (those with in_progress tickets)
+    const activeAgentIds = new Set(
+      tickets
+        .filter((t: any) => t.status === 'in_progress' && t.agent_id)
+        .map((t: any) => t.agent_id)
+    )
+
+    // Get unique active clients (those with new or in_progress tickets)
+    const activeClientIds = new Set(
+      tickets
+        .filter((t: any) => (t.status === 'new' || t.status === 'in_progress'))
+        .map((t: any) => t.client_id)
+    )
 
     return {
       totalTickets: tickets.length,
       ticketsByStatus,
-      activeAgents: users.filter(u => u.role === 'agent').length,
-      activeClients: users.filter(u => u.role === 'client').length
+      activeAgents: activeAgentIds.size,
+      activeClients: activeClientIds.size
     }
   }
 
   async function fetchAgentStats(): Promise<AgentStats[]> {
+    // First get all agents
     const { data: agents, error: agentsError } = await supabase
       .from('users')
       .select(`
         id,
         email,
         full_name,
-        last_seen,
         tickets!agent_id(status)
       `)
       .eq('role', 'agent')
 
     if (agentsError) throw agentsError
 
-    return agents.map((agent: any) => ({
-      id: agent.id,
-      name: agent.full_name || 'Unnamed Agent',
-      email: agent.email,
-      activeTickets: agent.tickets?.filter((t: any) => t.status === 'in_progress').length || 0,
-      totalTickets: agent.tickets?.length || 0,
-      lastActive: agent.last_seen || 'Never'
-    }))
+    console.log('Raw agent data:', agents) // Debug log
+
+    // For each agent, get their most recent activity
+    const agentsWithActivity = await Promise.all(
+      agents.map(async (agent: any) => {
+        // Get latest ticket activity
+        const { data: latestActivity } = await supabase
+          .from('ticket_activities')
+          .select('created_at')
+          .eq('user_id', agent.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        // Get latest ticket assignment
+        const { data: latestTicket } = await supabase
+          .from('tickets')
+          .select('updated_at')
+          .eq('agent_id', agent.id)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+
+        // Compare timestamps to get the most recent activity
+        const activityTime = latestActivity?.[0]?.created_at as string | undefined
+        const ticketTime = latestTicket?.[0]?.updated_at as string | undefined
+        let lastActive = 'Never'
+
+        if (activityTime && ticketTime) {
+          lastActive = new Date(activityTime) > new Date(ticketTime) ? activityTime : ticketTime
+        } else if (activityTime) {
+          lastActive = activityTime
+        } else if (ticketTime) {
+          lastActive = ticketTime
+        }
+
+        return {
+          id: agent.id,
+          name: agent.full_name || agent.email.split('@')[0] || 'Unnamed Agent',
+          email: agent.email,
+          activeTickets: agent.tickets?.filter((t: any) => t.status === 'in_progress').length || 0,
+          totalTickets: agent.tickets?.length || 0,
+          lastActive
+        }
+      })
+    )
+
+    return agentsWithActivity
   }
 
   async function fetchRecentActivities(): Promise<ActivityItem[]> {
@@ -128,21 +200,54 @@ export default function AdminPortal() {
         content,
         created_at,
         metadata,
-        tickets!ticket_id(number),
-        users!user_id(email, full_name)
+        tickets!ticket_id(
+          id,
+          number,
+          subject,
+          client:client_id(email, full_name)
+        ),
+        users!user_id(id, email, full_name, role)
       `)
       .order('created_at', { ascending: false })
       .limit(10)
 
     if (activitiesError) throw activitiesError
 
-    return activities.map((activity: any) => ({
-      id: activity.id,
-      type: activity.activity_type,
-      content: activity.content,
-      timestamp: activity.created_at,
-      metadata: activity.metadata
-    }))
+    return activities.map((activity: any) => {
+      // Process the content based on activity type
+      let processedContent = activity.content
+      const userName = activity.users.full_name || activity.users.email
+
+      if (activity.content === 'Ticket unassigned from agent') {
+        processedContent = `Ticket unassigned from agent: ${userName}`
+      } else if (activity.content === 'Ticket assigned to agent') {
+        processedContent = `Ticket assigned to agent: ${userName}`
+      } else {
+        processedContent = `${userName} commented: ${activity.content}`
+      }
+
+      return {
+        id: activity.id,
+        type: activity.activity_type,
+        content: processedContent,
+        timestamp: activity.created_at,
+        metadata: activity.metadata,
+        ticket: {
+          id: activity.tickets.id,
+          number: activity.tickets.number,
+          subject: activity.tickets.subject,
+          client: {
+            name: activity.tickets.client.full_name || activity.tickets.client.email,
+            email: activity.tickets.client.email
+          }
+        },
+        user: {
+          name: activity.users.full_name || activity.users.email,
+          email: activity.users.email,
+          role: activity.users.role
+        }
+      }
+    })
   }
 
   if (loading) {
@@ -197,27 +302,6 @@ export default function AdminPortal() {
         </div>
       </section>
 
-      {/* Recent Activity */}
-      <section>
-        <h2 className="text-2xl font-bold mb-4">Recent Activity</h2>
-        <div className="bg-white rounded-lg shadow">
-          <div className="divide-y">
-            {activities.map(activity => (
-              <div key={activity.id} className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">{activity.content}</p>
-                  </div>
-                  <span className="text-sm text-gray-400">
-                    {new Date(activity.timestamp).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Agent Performance */}
       <section>
         <h2 className="text-2xl font-bold mb-4">Agent Performance</h2>
@@ -256,6 +340,64 @@ export default function AdminPortal() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(agent.lastActive).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Recent Activity */}
+      <section>
+        <h2 className="text-2xl font-bold mb-4">Recent Activity</h2>
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Activity
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Ticket
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Client
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  User
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Time
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {activities.map(activity => (
+                <tr key={activity.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <p className="text-sm text-gray-900">{activity.content}</p>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm">
+                      <div className="font-medium text-gray-900">#{activity.ticket.number}</div>
+                      <div className="text-gray-500">{activity.ticket.subject}</div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm">
+                      <div className="font-medium text-gray-900">{activity.ticket.client.name}</div>
+                      <div className="text-gray-500">{activity.ticket.client.email}</div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm">
+                      <div className="font-medium text-gray-900">{activity.user.name}</div>
+                      <div className="text-gray-500">{activity.user.role}</div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(activity.timestamp).toLocaleString()}
                   </td>
                 </tr>
               ))}
