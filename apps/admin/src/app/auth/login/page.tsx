@@ -8,6 +8,7 @@ export default function LoginPage() {
         <AuthForm
           title="Welcome to Help Desk - Admin Portal"
           redirectTo="/admin-portal"
+          requireToken={true}
           appearance={{
             theme: ThemeSupa,
             variables: {

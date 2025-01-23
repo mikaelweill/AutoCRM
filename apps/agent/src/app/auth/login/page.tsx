@@ -8,6 +8,7 @@ export default function LoginPage() {
         <AuthForm
           title="Welcome to Help Desk - Agent Portal"
           redirectTo="/agent-portal"
+          requireToken={true}
           appearance={{
             theme: ThemeSupa,
             variables: {

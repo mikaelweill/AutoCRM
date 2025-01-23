@@ -1,7 +1,5 @@
 'use client'
 
-import { Auth } from '@supabase/auth-ui-react'
-import { ThemeSupa } from '@supabase/auth-ui-shared'
 import { createClient } from '../../lib/supabase'
 import { useEffect, useState } from 'react'
 import { AuthChangeEvent, Session } from '@supabase/supabase-js'
@@ -10,8 +8,9 @@ interface AuthFormProps {
   title?: string
   description?: string
   redirectTo?: string
+  requireToken?: boolean
   appearance?: {
-    theme: typeof ThemeSupa
+    theme: any
     variables?: {
       default: {
         colors: {
@@ -23,35 +22,30 @@ interface AuthFormProps {
   }
 }
 
+interface Invitation {
+  id: string
+  email: string
+  token: string
+  expires_at: string
+  used_at: string | null
+  created_at: string
+}
+
 export function AuthForm({ 
   title = 'Welcome back',
   description = 'Sign in to your account',
   redirectTo,
-  appearance = {
-    theme: ThemeSupa,
-    variables: {
-      default: {
-        colors: {
-          brand: '#0F172A',
-          brandAccent: '#2563EB'
-        }
-      }
-    }
-  }
+  requireToken = false,
+  appearance
 }: AuthFormProps) {
   const supabase = createClient()
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [token, setToken] = useState('')
+  const [view, setView] = useState<'sign_in' | 'sign_up'>('sign_in')
 
-  useEffect(() => {
-    // Remove console logs in production
-    if (process.env.NODE_ENV === 'production') return
-
-    console.log('AuthForm mounted')
-    console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
-    console.log('Redirect URL:', redirectTo || `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`)
-  }, [redirectTo])
-
-  // Separate effect for auth state to prevent unnecessary re-subscriptions
   useEffect(() => {
     const {
       data: { subscription },
@@ -68,6 +62,97 @@ export function AuthForm({
       subscription.unsubscribe()
     }
   }, [supabase.auth])
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      if (error) throw error
+    } catch (err) {
+      console.error('Error during sign in:', err)
+      setError(err instanceof Error ? err.message : 'An error occurred during sign in')
+    }
+  }
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      if (requireToken) {
+        if (!token) {
+          setError('Invitation token is required')
+          return
+        }
+
+        // Verify token first
+        const { data: invitation, error: inviteError } = await supabase
+          .from('invitations')
+          .select('*')
+          .eq('token', token)
+          .single()
+
+        if (inviteError || !invitation) {
+          setError('Invalid invitation token')
+          return
+        }
+
+        const invitationData = (invitation as unknown) as Invitation
+
+        if (invitationData.email !== email) {
+          setError('Email does not match invitation')
+          return
+        }
+
+        if (invitationData.expires_at && new Date(invitationData.expires_at) < new Date()) {
+          setError('Invitation token has expired')
+          return
+        }
+
+        if (invitationData.used_at) {
+          setError('Invitation token has already been used')
+          return
+        }
+      }
+
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectTo || `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`
+        }
+      })
+
+      if (signUpError) throw signUpError
+
+      if (requireToken) {
+        // Mark invitation as used
+        await supabase
+          .from('invitations')
+          .update({ used_at: new Date().toISOString() })
+          .eq('token', token)
+      }
+
+      setError(null)
+      setSuccess('Sign up successful! Please check your email for confirmation.')
+      
+      // Reset form
+      setEmail('')
+      setPassword('')
+      setToken('')
+      
+      // Switch to sign-in view after 3 seconds
+      setTimeout(() => {
+        setSuccess(null)
+        setView('sign_in')
+      }, 3000)
+
+    } catch (err) {
+      console.error('Error during signup:', err)
+      setError(err instanceof Error ? err.message : 'An error occurred during signup')
+    }
+  }
 
   return (
     <div className="flex min-h-screen flex-1 flex-col justify-center px-6 py-12 lg:px-8">
@@ -86,12 +171,93 @@ export function AuthForm({
             {error}
           </div>
         )}
-        <Auth
-          supabaseClient={supabase}
-          appearance={appearance}
-          providers={[]}
-          redirectTo={redirectTo || `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`}
-        />
+        {success && (
+          <div className="mb-4 p-4 text-sm text-green-700 bg-green-100 rounded-md">
+            {success}
+          </div>
+        )}
+
+        <form onSubmit={view === 'sign_in' ? handleSignIn : handleSignUp} className="space-y-6">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium leading-6 text-gray-900">
+              Email address
+            </label>
+            <div className="mt-2">
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium leading-6 text-gray-900">
+              Password
+            </label>
+            <div className="mt-2">
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+              />
+            </div>
+          </div>
+
+          {view === 'sign_up' && requireToken && (
+            <div>
+              <label htmlFor="token" className="block text-sm font-medium leading-6 text-gray-900">
+                Invitation Token
+              </label>
+              <div className="mt-2">
+                <input
+                  id="token"
+                  name="token"
+                  type="text"
+                  required
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  className="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <button
+              type="submit"
+              className="flex w-full justify-center rounded-md px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors duration-200"
+              style={{
+                backgroundColor: appearance?.variables?.default.colors.brand,
+              }}
+            >
+              {view === 'sign_in' ? 'Sign in' : 'Sign up'}
+            </button>
+          </div>
+        </form>
+
+        <p className="mt-10 text-center text-sm text-gray-500">
+          {view === 'sign_in' ? "Don't have an account? " : 'Already have an account? '}
+          <button
+            onClick={() => setView(view === 'sign_in' ? 'sign_up' : 'sign_in')}
+            className="font-semibold leading-6 transition-colors duration-200"
+            style={{
+              color: appearance?.variables?.default.colors.brand,
+            }}
+          >
+            {view === 'sign_in' ? 'Sign up' : 'Sign in'}
+          </button>
+        </p>
       </div>
     </div>
   )
