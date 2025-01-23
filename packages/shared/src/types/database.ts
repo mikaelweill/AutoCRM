@@ -72,6 +72,20 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['attachments']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['attachments']['Insert']>
       }
+      knowledge_base_articles: {
+        Row: {
+          id: string
+          title: string
+          content: string
+          category: string
+          is_published: boolean
+          created_at: string
+          updated_at: string
+          metadata: Record<string, any>
+        }
+        Insert: Omit<Database['public']['Tables']['knowledge_base_articles']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['knowledge_base_articles']['Insert']>
+      }
     }
   }
 } 

@@ -5,7 +5,7 @@ import { createClient } from 'shared/src/lib/supabase'
 import { Database } from 'shared/src/types/database'
 import { Card, CardContent, CardHeader, CardTitle } from 'shared/src/components/ui/card'
 import { Skeleton } from 'shared/src/components/ui/skeleton'
-import { Button } from 'shared/src/components/ui/button'
+import { Button } from 'shared/src/components/ui/Button'
 import { ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 
