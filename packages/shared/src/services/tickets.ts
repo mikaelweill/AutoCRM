@@ -269,7 +269,6 @@ export async function getTickets(): Promise<Ticket[]> {
         user:users(id, email, full_name)
       )
     `)
-    .neq('status', 'cancelled')
     .order('created_at', { ascending: false })
 
   if (error) {
