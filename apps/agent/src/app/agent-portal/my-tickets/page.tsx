@@ -5,7 +5,7 @@ import { createClient } from 'shared/src/lib/supabase'
 import { Ticket } from 'shared/src/services/tickets'
 import { Button } from 'shared/src/components/ui'
 import { Dialog } from 'shared/src/components/ui/Dialog'
-import { TicketTemplate } from 'shared/src/components/tickets/TicketTemplate'
+import { TicketTemplate, ActionButton } from 'shared/src/components/tickets/TicketTemplate'
 
 export default function MyTicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([])
@@ -164,26 +164,24 @@ export default function MyTicketsPage() {
                 getAttachmentUrl={getAttachmentUrl}
                 renderActions={ticket => ticket.status !== 'closed' && (
                   <div className="flex gap-2">
-                    <Button
+                    <ActionButton.unclaim
                       onClick={(e) => {
                         e.stopPropagation()
                         handleUnassign(ticket.id)
                       }}
-                      className="bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200"
                       loading={isUnassigning === ticket.id}
                     >
                       Unclaim
-                    </Button>
-                    <Button
+                    </ActionButton.unclaim>
+                    <ActionButton.close
                       onClick={(e) => {
                         e.stopPropagation()
                         handleClose(ticket.id)
                       }}
-                      className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200"
                       loading={isClosing === ticket.id}
                     >
                       Close
-                    </Button>
+                    </ActionButton.close>
                   </div>
                 )}
               />
@@ -203,20 +201,18 @@ export default function MyTicketsPage() {
               isDetailView={true}
               renderActions={ticket => ticket.status !== 'closed' && (
                 <div className="flex gap-2">
-                  <Button
+                  <ActionButton.unclaim
                     onClick={() => handleUnassign(ticket.id)}
-                    className="bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200"
                     loading={isUnassigning === ticket.id}
                   >
                     Unclaim
-                  </Button>
-                  <Button
+                  </ActionButton.unclaim>
+                  <ActionButton.close
                     onClick={() => handleClose(ticket.id)}
-                    className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200"
                     loading={isClosing === ticket.id}
                   >
                     Close
-                  </Button>
+                  </ActionButton.close>
                 </div>
               )}
             />

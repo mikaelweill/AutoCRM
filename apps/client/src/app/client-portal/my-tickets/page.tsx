@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useAuth } from "shared/src/contexts/AuthContext"
 import { CreateTicketForm } from 'shared/src/components/tickets/CreateTicketForm'
-import { TicketTemplate } from 'shared/src/components/tickets/TicketTemplate'
+import { TicketTemplate, ActionButton } from 'shared/src/components/tickets/TicketTemplate'
 import { Dialog } from 'shared/src/components/ui/Dialog'
 import { Button } from 'shared/src/components/ui/Button'
 import { Ticket, getTickets, cancelTicket, getAttachmentUrl } from 'shared/src/services/tickets'
@@ -142,16 +142,15 @@ export default function MyTicketsPage() {
                 onTicketClick={setSelectedTicket}
                 getAttachmentUrl={handleGetAttachmentUrl}
                 renderActions={ticket => ticket.status !== 'cancelled' && (
-                  <Button
+                  <ActionButton.cancel
                     onClick={(e) => {
                       e.stopPropagation()
                       handleCancelTicket(ticket.id)
                     }}
-                    className="bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200"
                     disabled={isCancelling === ticket.id}
                   >
                     {isCancelling === ticket.id ? 'Cancelling...' : 'Cancel'}
-                  </Button>
+                  </ActionButton.cancel>
                 )}
               />
             ))}
@@ -180,13 +179,12 @@ export default function MyTicketsPage() {
               getAttachmentUrl={handleGetAttachmentUrl}
               isDetailView={true}
               renderActions={ticket => ticket.status !== 'cancelled' && (
-                <Button
+                <ActionButton.cancel
                   onClick={() => handleCancelTicket(ticket.id)}
-                  className="bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200"
                   disabled={isCancelling === ticket.id}
                 >
                   {isCancelling === ticket.id ? 'Cancelling...' : 'Cancel'}
-                </Button>
+                </ActionButton.cancel>
               )}
             />
           )}

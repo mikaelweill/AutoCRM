@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { Ticket, TicketActivity } from '../../services/tickets'
 import { TICKET_PRIORITIES, TICKET_STATUSES } from '../../config/tickets'
 import { UserCircle, Clock, Send } from 'lucide-react'
@@ -196,6 +197,49 @@ const CommentSection = ({ ticket, readOnly }: { ticket: Ticket; readOnly?: boole
         </div>
       )}
     </div>
+  )
+}
+
+// Action button variants with consistent styling
+export const ActionButton = {
+  claim: ({ onClick, loading, children }: { onClick: (e: React.MouseEvent) => void, loading?: boolean, children: React.ReactNode }) => (
+    <Button
+      onClick={onClick}
+      disabled={loading}
+      variant="success"
+    >
+      {loading ? 'Loading...' : children}
+    </Button>
+  ),
+  
+  unclaim: ({ onClick, loading, children }: { onClick: (e: React.MouseEvent) => void, loading?: boolean, children: React.ReactNode }) => (
+    <Button
+      onClick={onClick}
+      disabled={loading}
+      variant="destructive"
+    >
+      {loading ? 'Loading...' : children}
+    </Button>
+  ),
+  
+  close: ({ onClick, loading, children }: { onClick: (e: React.MouseEvent) => void, loading?: boolean, children: React.ReactNode }) => (
+    <Button
+      onClick={onClick}
+      disabled={loading}
+      variant="success"
+    >
+      {loading ? 'Loading...' : children}
+    </Button>
+  ),
+  
+  cancel: ({ onClick, loading, children }: { onClick: (e: React.MouseEvent) => void, loading?: boolean, children: React.ReactNode }) => (
+    <Button
+      onClick={onClick}
+      disabled={loading}
+      variant="destructive"
+    >
+      {loading ? 'Loading...' : children}
+    </Button>
   )
 }
 

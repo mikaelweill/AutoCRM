@@ -5,7 +5,7 @@ import { createClient } from 'shared/src/lib/supabase'
 import { Database } from 'shared/src/types/database'
 import { Button } from 'shared/src/components/ui'
 import { Dialog } from 'shared/src/components/ui/Dialog'
-import { TicketTemplate } from 'shared/src/components/tickets/TicketTemplate'
+import { TicketTemplate, ActionButton } from 'shared/src/components/tickets/TicketTemplate'
 
 type Ticket = Database['public']['Tables']['tickets']['Row'] & {
   client: Database['public']['Tables']['users']['Row']
@@ -140,15 +140,14 @@ export default function TicketQueuePage() {
                 getAttachmentUrl={getAttachmentUrl}
                 readOnlyComments={true}
                 renderActions={ticket => (
-                  <Button
+                  <ActionButton.claim
                     onClick={(e) => {
                       e.stopPropagation()
                       handleAssign(ticket.id)
                     }}
-                    className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200"
                   >
                     Claim
-                  </Button>
+                  </ActionButton.claim>
                 )}
               />
             ))}
@@ -167,12 +166,11 @@ export default function TicketQueuePage() {
               isDetailView={true}
               readOnlyComments={true}
               renderActions={ticket => (
-                <Button
+                <ActionButton.claim
                   onClick={() => handleAssign(ticket.id)}
-                  className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200"
                 >
                   Claim
-                </Button>
+                </ActionButton.claim>
               )}
             />
           )}
