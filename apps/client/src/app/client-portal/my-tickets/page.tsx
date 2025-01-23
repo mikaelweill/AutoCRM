@@ -7,6 +7,7 @@ import { ActionButton } from 'shared/src/components/tickets/TicketTemplate'
 import { TicketList } from 'shared/src/components/tickets/TicketList'
 import { Ticket, getTickets, cancelTicket, reopenTicket, getAttachmentUrl } from 'shared/src/services/tickets'
 import { TICKET_PRIORITIES } from 'shared/src/config/tickets'
+import { createClient } from 'shared/src/lib/supabase'
 
 export default function MyNewTicketsPage() {
   const { user } = useAuth()
@@ -18,6 +19,30 @@ export default function MyNewTicketsPage() {
 
   useEffect(() => {
     fetchTickets()
+
+    const supabase = createClient()
+    
+    // Subscribe to ticket changes
+    const channel = supabase
+      .channel('client-tickets-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tickets'
+        },
+        () => {
+          console.log('Tickets updated, refreshing...')
+          fetchTickets()
+        }
+      )
+      .subscribe()
+
+    // Cleanup subscription
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   async function fetchTickets() {

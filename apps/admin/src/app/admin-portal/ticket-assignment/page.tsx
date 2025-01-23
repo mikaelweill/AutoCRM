@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from 'shared/src/lib/supabase'
-import { TICKET_PRIORITIES, TICKET_STATUSES } from 'shared/src/config/tickets'
+import { TICKET_PRIORITIES, TICKET_STATUSES, getStatusDetails, getPriorityDetails } from 'shared/src/config/tickets'
 
 interface TicketRow {
   id: string
@@ -239,7 +239,9 @@ export default function TicketAssignmentPage() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <select
-                    className="text-sm border-gray-300 rounded-md"
+                    className={`text-sm rounded-md px-3 py-1 font-medium ${
+                      getStatusDetails(ticket.status as any)?.color || 'bg-gray-100 text-gray-800'
+                    }`}
                     value={ticket.status}
                     onChange={(e) => {
                       const newStatus = e.target.value
@@ -261,6 +263,7 @@ export default function TicketAssignmentPage() {
                         key={status.value} 
                         value={status.value}
                         disabled={status.value === 'in_progress' && !ticket.agent}
+                        className={status.color}
                       >
                         {status.label}
                       </option>
@@ -269,12 +272,18 @@ export default function TicketAssignmentPage() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <select
-                    className="text-sm border-gray-300 rounded-md"
+                    className={`text-sm rounded-md px-3 py-1 font-medium ${
+                      getPriorityDetails(ticket.priority as any)?.color || 'bg-gray-100 text-gray-800'
+                    }`}
                     value={ticket.priority}
                     onChange={(e) => updateTicket(ticket.id, { priority: e.target.value })}
                   >
                     {TICKET_PRIORITIES.map(priority => (
-                      <option key={priority.value} value={priority.value}>
+                      <option 
+                        key={priority.value} 
+                        value={priority.value}
+                        className={priority.color}
+                      >
                         {priority.label}
                       </option>
                     ))}

@@ -5,6 +5,7 @@ import { Ticket, getUnassignedTickets, assignTicket, getAttachmentUrl } from 'sh
 import { ActionButton } from 'shared/src/components/tickets/TicketTemplate'
 import { TicketList } from 'shared/src/components/tickets/TicketList'
 import { TICKET_PRIORITIES, TICKET_STATUSES } from 'shared/src/config/tickets'
+import { createClient } from 'shared/src/lib/supabase'
 
 export default function TicketQueuePage() {
   const [tickets, setTickets] = useState<Ticket[]>([])
@@ -14,6 +15,30 @@ export default function TicketQueuePage() {
 
   useEffect(() => {
     fetchTickets()
+
+    const supabase = createClient()
+    
+    // Subscribe to ticket changes
+    const channel = supabase
+      .channel('ticket-queue-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tickets'
+        },
+        () => {
+          console.log('Tickets updated, refreshing queue...')
+          fetchTickets()
+        }
+      )
+      .subscribe()
+
+    // Cleanup subscription
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   async function fetchTickets() {
