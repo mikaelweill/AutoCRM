@@ -34,8 +34,12 @@ const supabaseAdmin = createClient(
 
 // List of allowed origins
 const allowedOrigins = [
+  'http://localhost:3000',
   'http://localhost:3001',
+  'http://localhost:3002',
+  'https://auto-crm-client.vercel.app',
   'https://auto-crm-agent.vercel.app',
+  'https://auto-crm-admin.vercel.app',
   Deno.env.get('PROD_URL'),
 ].filter(Boolean) // Remove any undefined values
 
@@ -105,6 +109,44 @@ serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: 'Invalid invitation token' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Validate role based on origin
+    console.log('Origin validation:', { origin })
+    
+    // Determine which portal we're on based on URL
+    let requiredRole = null;
+    
+    // Handle localhost URLs
+    if (origin?.includes('localhost:3000')) {
+      requiredRole = 'client';
+    } else if (origin?.includes('localhost:3001')) {
+      requiredRole = 'agent';
+    } else if (origin?.includes('localhost:3002')) {
+      requiredRole = 'admin';
+    }
+    // Handle production URLs
+    else if (origin?.includes('auto-crm-client')) {
+      requiredRole = 'client';
+    } else if (origin?.includes('auto-crm-agent')) {
+      requiredRole = 'agent';
+    } else if (origin?.includes('auto-crm-admin')) {
+      requiredRole = 'admin';
+    }
+
+    console.log('Portal validation result:', {
+      origin,
+      requiredRole,
+      invitationRole: invitation.role,
+      willBlock: requiredRole && invitation.role !== requiredRole
+    })
+
+    // Strict role checking - must be on the correct portal for your role
+    if (requiredRole && invitation.role !== requiredRole) {
+      return new Response(
+        JSON.stringify({ error: `This signup link can only be used on the ${invitation.role} portal` }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
