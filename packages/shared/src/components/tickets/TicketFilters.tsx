@@ -7,13 +7,15 @@ interface TicketFiltersProps {
   selectedPriorities: TicketPriority[]
   onStatusChange: (statuses: TicketStatus[]) => void
   onPriorityChange: (priorities: TicketPriority[]) => void
+  availableStatuses?: typeof TICKET_STATUSES
 }
 
 export function TicketFilters({
   selectedStatuses,
   selectedPriorities,
   onStatusChange,
-  onPriorityChange
+  onPriorityChange,
+  availableStatuses = TICKET_STATUSES
 }: TicketFiltersProps) {
   return (
     <div className="space-y-4">
@@ -21,7 +23,7 @@ export function TicketFilters({
       <div>
         <h3 className="text-sm font-medium text-gray-700 mb-2">Status</h3>
         <div className="flex flex-wrap gap-4 p-1">
-          {TICKET_STATUSES.map(status => (
+          {availableStatuses.map(status => (
             <button
               key={status.value}
               onClick={() => {

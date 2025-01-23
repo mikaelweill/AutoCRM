@@ -3,7 +3,7 @@
 import React from 'react'
 import { useState, useEffect } from 'react'
 import { Ticket } from '../../services/tickets'
-import { TicketStatus, TicketPriority, TICKET_PRIORITIES } from '../../config/tickets'
+import { TicketStatus, TicketPriority, TICKET_PRIORITIES, TICKET_STATUSES } from '../../config/tickets'
 import { TicketTemplate } from './TicketTemplate'
 import { TicketFilters } from './TicketFilters'
 import { Dialog } from '../ui/Dialog'
@@ -26,6 +26,8 @@ interface TicketListProps {
     onSuccess?: (ticketId: string) => void
     onCancel?: () => void
   }>
+  // Control which status filters are available
+  availableStatuses?: typeof TICKET_STATUSES
 }
 
 interface FilterState {
@@ -44,7 +46,8 @@ export function TicketList({
   hideComments = false,
   hideAttachments = false,
   renderHeader,
-  renderCreateForm
+  renderCreateForm,
+  availableStatuses = TICKET_STATUSES
 }: TicketListProps) {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -58,8 +61,14 @@ export function TicketList({
 
   // Filter tickets based on current filters
   const filteredTickets = tickets.filter(ticket => {
-    const matchesStatus = filters.statuses.length === 0 || filters.statuses.includes(ticket.status)
-    const matchesPriority = filters.priorities.length === 0 || filters.priorities.includes(ticket.priority)
+    // If no filters are selected, show no tickets
+    if (filters.statuses.length === 0 && filters.priorities.length === 0) {
+      return false
+    }
+
+    // Otherwise, apply selected filters
+    const matchesStatus = filters.statuses.includes(ticket.status)
+    const matchesPriority = filters.priorities.includes(ticket.priority)
     const matchesSearch = !filters.searchTerm || 
       ticket.subject.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
       ticket.description.toLowerCase().includes(filters.searchTerm.toLowerCase())
@@ -96,13 +105,18 @@ export function TicketList({
           selectedPriorities={filters.priorities}
           onStatusChange={statuses => setFilters(prev => ({ ...prev, statuses }))}
           onPriorityChange={priorities => setFilters(prev => ({ ...prev, priorities }))}
+          availableStatuses={availableStatuses}
         />
       </div>
 
       {/* Results Section */}
       {filteredTickets.length === 0 ? (
         <div className="text-center py-8 bg-white shadow rounded-lg">
-          <p className="text-gray-500">No tickets match your filters</p>
+          <p className="text-gray-500">
+            {filters.statuses.length === 0 && filters.priorities.length === 0
+              ? 'Select filters to view tickets'
+              : 'No tickets match your filters'}
+          </p>
         </div>
       ) : (
         <div className="space-y-4">

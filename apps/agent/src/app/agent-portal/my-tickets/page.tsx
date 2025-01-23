@@ -1,97 +1,40 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { createClient } from 'shared/src/lib/supabase'
-import { Ticket, getMyTickets } from 'shared/src/services/tickets'
-import { Button } from 'shared/src/components/ui'
-import { Dialog } from 'shared/src/components/ui/Dialog'
-import { TicketTemplate, ActionButton } from 'shared/src/components/tickets/TicketTemplate'
+import { useState, useEffect } from 'react'
+import { Ticket, getMyTickets, unassignTicket, closeTicket, getAttachmentUrl } from 'shared/src/services/tickets'
+import { ActionButton } from 'shared/src/components/tickets/TicketTemplate'
+import { TicketList } from 'shared/src/components/tickets/TicketList'
+import { TICKET_PRIORITIES, TICKET_STATUSES } from 'shared/src/config/tickets'
 
 export default function MyTicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([])
-  const [loading, setLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
-  const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({})
-  const [isClosing, setIsClosing] = useState<string | null>(null)
   const [isUnassigning, setIsUnassigning] = useState<string | null>(null)
+  const [isClosing, setIsClosing] = useState<string | null>(null)
 
   useEffect(() => {
-    const supabase = createClient()
-
-    // Initial fetch of my tickets
-    async function fetchMyTickets() {
-      try {
-        const data = await getMyTickets()
-        setTickets(data)
-        setError(null)
-      } catch (err) {
-        console.error('Error fetching tickets:', err)
-        setError('Failed to load tickets')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    // Subscribe to changes
-    const channel = supabase
-      .channel('my-tickets')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'tickets'
-        },
-        () => {
-          fetchMyTickets()
-        }
-      )
-      .subscribe()
-
-    fetchMyTickets()
-
-    return () => {
-      channel.unsubscribe()
-    }
+    fetchTickets()
   }, [])
 
-  const handleClose = async (ticketId: string) => {
-    const supabase = createClient()
+  async function fetchTickets() {
     try {
-      setIsClosing(ticketId)
-      const { error } = await supabase
-        .from('tickets')
-        .update({ 
-          status: 'closed',
-          resolved_at: new Date().toISOString()
-        })
-        .eq('id', ticketId)
-      
-      if (error) throw error
-      setSelectedTicket(null)
+      const data = await getMyTickets()
+      setTickets(data)
+      setError(null)
     } catch (err) {
-      console.error('Error closing ticket:', err)
-      setError('Failed to close ticket')
+      console.error('Error fetching tickets:', err)
+      setError('Failed to fetch tickets')
     } finally {
-      setIsClosing(null)
+      setIsLoading(false)
     }
   }
 
   const handleUnassign = async (ticketId: string) => {
-    const supabase = createClient()
     try {
       setIsUnassigning(ticketId)
-      const { error } = await supabase
-        .from('tickets')
-        .update({ 
-          agent_id: null,
-          status: 'new'
-        })
-        .eq('id', ticketId)
-      
-      if (error) throw error
-      setSelectedTicket(null)
+      await unassignTicket(ticketId)
+      await fetchTickets()
     } catch (err) {
       console.error('Error unassigning ticket:', err)
       setError('Failed to unassign ticket')
@@ -100,21 +43,23 @@ export default function MyTicketsPage() {
     }
   }
 
-  const getAttachmentUrl = async (path: string) => {
-    if (attachmentUrls[path]) return attachmentUrls[path]
-    
-    const supabase = createClient()
-    const { data } = await supabase.storage.from('attachments').getPublicUrl(path)
-    const url = data.publicUrl
-    setAttachmentUrls(prev => ({ ...prev, [path]: url }))
-    return url
+  const handleClose = async (ticketId: string) => {
+    try {
+      setIsClosing(ticketId)
+      await closeTicket(ticketId)
+      await fetchTickets()
+    } catch (err) {
+      console.error('Error closing ticket:', err)
+      setError('Failed to close ticket')
+    } finally {
+      setIsClosing(null)
+    }
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="h-full overflow-auto">
         <div className="max-w-3xl mx-auto p-6">
-          <h1 className="text-2xl font-semibold mb-6">My Tickets</h1>
           <div className="flex justify-center p-4">Loading...</div>
         </div>
       </div>
@@ -125,84 +70,56 @@ export default function MyTicketsPage() {
     return (
       <div className="h-full overflow-auto">
         <div className="max-w-3xl mx-auto p-6">
-          <h1 className="text-2xl font-semibold mb-6">My Tickets</h1>
           <div className="text-red-500">{error}</div>
         </div>
       </div>
     )
   }
 
+  // Filter out statuses that shouldn't appear in my tickets
+  const myTicketStatuses = TICKET_STATUSES.filter(status => 
+    ['in_progress', 'closed', 'cancelled'].includes(status.value)
+  )
+
   return (
     <div className="h-full overflow-auto">
       <div className="max-w-3xl mx-auto p-6">
-        <h1 className="text-2xl font-semibold mb-6">My Tickets</h1>
-        
-        {!tickets.length ? (
-          <div className="text-gray-500">No tickets assigned to you</div>
-        ) : (
-          <div className="space-y-4">
-            {tickets.map((ticket) => (
-              <TicketTemplate
-                key={ticket.id}
-                ticket={ticket}
-                onTicketClick={() => setSelectedTicket(ticket)}
-                getAttachmentUrl={getAttachmentUrl}
-                renderActions={ticket => ticket.status !== 'closed' && (
-                  <div className="flex gap-2">
-                    <ActionButton.unclaim
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleUnassign(ticket.id)
-                      }}
-                      loading={isUnassigning === ticket.id}
-                    >
-                      Unclaim
-                    </ActionButton.unclaim>
-                    <ActionButton.close
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleClose(ticket.id)
-                      }}
-                      loading={isClosing === ticket.id}
-                    >
-                      Close
-                    </ActionButton.close>
-                  </div>
-                )}
-              />
-            ))}
-          </div>
-        )}
-
-        <Dialog
-          isOpen={selectedTicket !== null}
-          onClose={() => setSelectedTicket(null)}
-          title={selectedTicket ? `Ticket #${selectedTicket.number}` : ''}
-        >
-          {selectedTicket && (
-            <TicketTemplate
-              ticket={selectedTicket}
-              getAttachmentUrl={getAttachmentUrl}
-              isDetailView={true}
-              renderActions={ticket => ticket.status !== 'closed' && (
-                <div className="flex gap-2">
-                  <ActionButton.unclaim
-                    onClick={() => handleUnassign(ticket.id)}
-                    loading={isUnassigning === ticket.id}
-                  >
-                    Unclaim
-                  </ActionButton.unclaim>
-                  <ActionButton.close
-                    onClick={() => handleClose(ticket.id)}
-                    loading={isClosing === ticket.id}
-                  >
-                    Close
-                  </ActionButton.close>
-                </div>
+        <TicketList
+          tickets={tickets}
+          defaultFilters={{
+            statuses: ['in_progress'],
+            priorities: TICKET_PRIORITIES.map(p => p.value)
+          }}
+          availableStatuses={myTicketStatuses}
+          renderHeader={<h1 className="text-2xl font-semibold">My Tickets</h1>}
+          renderActions={ticket => (
+            <div className="flex gap-2">
+              {ticket.status !== 'closed' && (
+                <ActionButton.close
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleClose(ticket.id)
+                  }}
+                  loading={isClosing === ticket.id}
+                >
+                  {isClosing === ticket.id ? 'Closing...' : 'Close'}
+                </ActionButton.close>
               )}
-            />
+              {ticket.status !== 'closed' && (
+                <ActionButton.unclaim
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleUnassign(ticket.id)
+                  }}
+                  loading={isUnassigning === ticket.id}
+                >
+                  {isUnassigning === ticket.id ? 'Unassigning...' : 'Unassign'}
+                </ActionButton.unclaim>
+              )}
+            </div>
           )}
-        </Dialog>
+          getAttachmentUrl={getAttachmentUrl}
+        />
       </div>
     </div>
   )
