@@ -173,7 +173,7 @@ serve(async (req: Request) => {
     const { data: user, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true,
+      email_confirm: true, // Auto-confirm email
       app_metadata: { user_role: invitation.role },
     })
 
@@ -184,8 +184,6 @@ serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    console.log('Auth user created successfully:', { userId: user.id, role: invitation.role, fullUser: user })
 
     // Create corresponding record in public.users
     const { error: publicUserError } = await supabaseAdmin
@@ -206,9 +204,7 @@ serve(async (req: Request) => {
       )
     }
 
-    console.log('Public user created successfully')
-
-    // Mark invitation as used BEFORE returning success
+    // Mark invitation as used
     const { error: updateError } = await supabaseAdmin
       .from('invitations')
       .update({ used_at: new Date().toISOString() })
@@ -222,10 +218,10 @@ serve(async (req: Request) => {
       )
     }
 
-    console.log('Invitation marked as used successfully')
+    console.log('User created successfully')
 
     return new Response(
-      JSON.stringify({ user }),
+      JSON.stringify({ user: user.user }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
