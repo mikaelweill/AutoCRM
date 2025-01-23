@@ -8,8 +8,7 @@ import { hasRequiredRole } from "shared/src/auth/utils"
 
 const clientNavLinks = [
   { href: '/client-portal', label: 'Dashboard' },
-  { href: '/client-portal/my-tickets', label: 'My Tickets (Old)' },
-  { href: '/client-portal/my-new-tickets', label: 'My Tickets (New)' },
+  { href: '/client-portal/my-tickets', label: 'My Tickets' },
   { href: '/client-portal/knowledge-base', label: 'Knowledge Base' }
 ]
 

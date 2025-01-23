@@ -1,50 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from "shared/src/contexts/AuthContext"
 import { CreateTicketForm } from 'shared/src/components/tickets/CreateTicketForm'
-import { TicketTemplate, ActionButton } from 'shared/src/components/tickets/TicketTemplate'
-import { Dialog } from 'shared/src/components/ui/Dialog'
-import { Button } from 'shared/src/components/ui/Button'
-import { Ticket, getTickets, cancelTicket, getAttachmentUrl } from 'shared/src/services/tickets'
-import { useEffect } from 'react'
-import { createClient } from 'shared/src/lib/supabase'
+import { ActionButton } from 'shared/src/components/tickets/TicketTemplate'
+import { TicketList } from 'shared/src/components/tickets/TicketList'
+import { Ticket, getTickets, cancelTicket, reopenTicket, getAttachmentUrl } from 'shared/src/services/tickets'
+import { TICKET_PRIORITIES } from 'shared/src/config/tickets'
 
-export default function MyTicketsPage() {
+export default function MyNewTicketsPage() {
   const { user } = useAuth()
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isCancelling, setIsCancelling] = useState<string | null>(null)
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
-  const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({})
+  const [isReopening, setIsReopening] = useState<string | null>(null)
 
   useEffect(() => {
-    const supabase = createClient()
-    
-    // Initial fetch
     fetchTickets()
-
-    // Set up real-time subscription
-    const channel = supabase
-      .channel('public:tickets')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'tickets'
-        },
-        () => {
-          fetchTickets()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [])
 
   async function fetchTickets() {
@@ -53,23 +26,22 @@ export default function MyTicketsPage() {
       setTickets(data)
       setError(null)
     } catch (err) {
-      setError('Failed to fetch tickets')
       console.error('Error fetching tickets:', err)
+      setError('Failed to fetch tickets')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleCreateTicket = async (ticketId: string) => {
-    setIsCreateModalOpen(false)
-    fetchTickets()
+  const handleCreateTicket = async () => {
+    await fetchTickets()
   }
 
   const handleCancelTicket = async (ticketId: string) => {
     try {
       setIsCancelling(ticketId)
       await cancelTicket(ticketId)
-      setSelectedTicket(null) // Close modal if open
+      await fetchTickets()
     } catch (err) {
       console.error('Error cancelling ticket:', err)
       setError('Failed to cancel ticket')
@@ -78,26 +50,24 @@ export default function MyTicketsPage() {
     }
   }
 
-  // Get attachment URL and cache it
-  async function handleGetAttachmentUrl(path: string) {
-    if (attachmentUrls[path]) return attachmentUrls[path]
-    
-    const url = await getAttachmentUrl(path)
-    setAttachmentUrls(prev => ({ ...prev, [path]: url }))
-    return url
+  const handleReopenTicket = async (ticketId: string) => {
+    try {
+      setIsReopening(ticketId)
+      await reopenTicket(ticketId)
+      await fetchTickets()
+    } catch (err) {
+      console.error('Error reopening ticket:', err)
+      setError('Failed to reopen ticket')
+    } finally {
+      setIsReopening(null)
+    }
   }
 
   if (isLoading) {
     return (
       <div className="h-full overflow-auto">
-        <div className="max-w-xl mx-auto p-8">
-          <div className="flex justify-between items-center mb-8">
-            <h1 className="text-2xl font-semibold text-gray-900">My Tickets</h1>
-            <Button onClick={() => setIsCreateModalOpen(true)}>
-              Create Ticket
-            </Button>
-          </div>
-          <div className="text-center py-8">Loading tickets...</div>
+        <div className="max-w-3xl mx-auto p-6">
+          <div className="flex justify-center p-4">Loading...</div>
         </div>
       </div>
     )
@@ -106,14 +76,8 @@ export default function MyTicketsPage() {
   if (error) {
     return (
       <div className="h-full overflow-auto">
-        <div className="max-w-xl mx-auto p-8">
-          <div className="flex justify-between items-center mb-8">
-            <h1 className="text-2xl font-semibold text-gray-900">My Tickets</h1>
-            <Button onClick={() => setIsCreateModalOpen(true)}>
-              Create Ticket
-            </Button>
-          </div>
-          <div className="text-center py-8 text-red-600">{error}</div>
+        <div className="max-w-3xl mx-auto p-6">
+          <div className="text-red-500">{error}</div>
         </div>
       </div>
     )
@@ -121,74 +85,48 @@ export default function MyTicketsPage() {
 
   return (
     <div className="h-full overflow-auto">
-      <div className="max-w-xl mx-auto p-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-semibold text-gray-900">My Tickets</h1>
-          <Button onClick={() => setIsCreateModalOpen(true)}>
-            Create Ticket
-          </Button>
-        </div>
-
-        {!tickets.length ? (
-          <div className="text-center py-8 text-gray-500">
-            No tickets found. Create your first ticket to get started.
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {tickets.map((ticket) => (
-              <TicketTemplate
-                key={ticket.id}
-                ticket={ticket}
-                onTicketClick={setSelectedTicket}
-                getAttachmentUrl={handleGetAttachmentUrl}
-                renderActions={ticket => ticket.status !== 'cancelled' && (
-                  <ActionButton.cancel
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleCancelTicket(ticket.id)
-                    }}
-                    disabled={isCancelling === ticket.id}
-                  >
-                    {isCancelling === ticket.id ? 'Cancelling...' : 'Cancel'}
-                  </ActionButton.cancel>
-                )}
-              />
-            ))}
-          </div>
-        )}
-
-        <Dialog
-          isOpen={isCreateModalOpen}
-          onClose={() => setIsCreateModalOpen(false)}
-          title="Create New Ticket"
-        >
-          <CreateTicketForm
-            onSuccess={handleCreateTicket}
-            onCancel={() => setIsCreateModalOpen(false)}
-          />
-        </Dialog>
-
-        <Dialog
-          isOpen={selectedTicket !== null}
-          onClose={() => setSelectedTicket(null)}
-          title={selectedTicket ? `Ticket #${selectedTicket.number}` : ''}
-        >
-          {selectedTicket && (
-            <TicketTemplate
-              ticket={selectedTicket}
-              getAttachmentUrl={handleGetAttachmentUrl}
-              isDetailView={true}
-              renderActions={ticket => ticket.status !== 'cancelled' && (
-                <ActionButton.cancel
-                  onClick={() => handleCancelTicket(ticket.id)}
-                  disabled={isCancelling === ticket.id}
+      <div className="max-w-3xl mx-auto p-6">
+        <TicketList
+          tickets={tickets}
+          defaultFilters={{
+            statuses: ['new', 'in_progress'],
+            priorities: TICKET_PRIORITIES.map(p => p.value)
+          }}
+          renderHeader={<h1 className="text-2xl font-semibold">My Tickets</h1>}
+          renderActions={ticket => {
+            if (ticket.status === 'closed' || ticket.status === 'cancelled') {
+              return (
+                <ActionButton.reopen
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleReopenTicket(ticket.id)
+                  }}
+                  loading={isReopening === ticket.id}
                 >
-                  {isCancelling === ticket.id ? 'Cancelling...' : 'Cancel'}
-                </ActionButton.cancel>
-              )}
+                  {isReopening === ticket.id ? 'Reopening...' : 'Reopen'}
+                </ActionButton.reopen>
+              )
+            }
+            return (
+              <ActionButton.cancel
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleCancelTicket(ticket.id)
+                }}
+                loading={isCancelling === ticket.id}
+              >
+                {isCancelling === ticket.id ? 'Cancelling...' : 'Cancel'}
+              </ActionButton.cancel>
+            )
+          }}
+          renderCreateForm={
+            <CreateTicketForm
+              onSuccess={handleCreateTicket}
+              onCancel={() => {}} // This will be handled by Dialog
             />
-          )}
-        </Dialog>
+          }
+          getAttachmentUrl={getAttachmentUrl}
+        />
       </div>
     </div>
   )
