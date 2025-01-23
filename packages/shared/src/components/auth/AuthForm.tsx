@@ -1,6 +1,7 @@
 'use client'
 
 import { createClient } from '../../lib/supabase'
+import { signUpWithToken } from '../../../../../shared/src/lib/api'
 import { useEffect, useState } from 'react'
 import { AuthChangeEvent, Session } from '@supabase/supabase-js'
 
@@ -86,36 +87,32 @@ export function AuthForm({
           return
         }
 
-        // Verify token first
-        const { data: invitation, error: inviteError } = await supabase
-          .from('invitations')
-          .select('*')
-          .eq('token', token)
-          .single()
-
-        if (inviteError || !invitation) {
-          setError('Invalid invitation token')
+        // Use our new edge function for token signup
+        const result = await signUpWithToken(email, password, token)
+        
+        if (result.error) {
+          setError(result.error)
           return
         }
 
-        const invitationData = (invitation as unknown) as Invitation
+        setError(null)
+        setSuccess('Sign up successful! Please check your email for confirmation.')
+        
+        // Reset form
+        setEmail('')
+        setPassword('')
+        setToken('')
+        
+        // Switch to sign-in view after 3 seconds
+        setTimeout(() => {
+          setSuccess(null)
+          setView('sign_in')
+        }, 3000)
 
-        if (invitationData.email !== email) {
-          setError('Email does not match invitation')
-          return
-        }
-
-        if (invitationData.expires_at && new Date(invitationData.expires_at) < new Date()) {
-          setError('Invitation token has expired')
-          return
-        }
-
-        if (invitationData.used_at) {
-          setError('Invitation token has already been used')
-          return
-        }
+        return
       }
 
+      // Regular signup (no token required)
       const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -126,21 +123,12 @@ export function AuthForm({
 
       if (signUpError) throw signUpError
 
-      if (requireToken) {
-        // Mark invitation as used
-        await supabase
-          .from('invitations')
-          .update({ used_at: new Date().toISOString() })
-          .eq('token', token)
-      }
-
       setError(null)
       setSuccess('Sign up successful! Please check your email for confirmation.')
       
       // Reset form
       setEmail('')
       setPassword('')
-      setToken('')
       
       // Switch to sign-in view after 3 seconds
       setTimeout(() => {
