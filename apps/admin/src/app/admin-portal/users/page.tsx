@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from 'shared/src/lib/supabase'
-import { Shield, UserCog } from 'lucide-react'
+import { Shield, UserCog, Eye, EyeOff, Copy } from 'lucide-react'
 
 interface Invitation {
   id: string
@@ -22,6 +22,7 @@ export default function UsersPage() {
   const [role, setRole] = useState<'admin' | 'agent'>('agent')
   const [isCreating, setIsCreating] = useState(false)
   const [showToken, setShowToken] = useState<string | null>(null)
+  const [revealedTokens, setRevealedTokens] = useState<Set<string>>(new Set())
   
   const supabase = createClient()
 
@@ -72,6 +73,8 @@ export default function UsersPage() {
 
       setInvitations(validatedData)
       setError(null)
+      // Clear revealed tokens when invitations are refreshed
+      setRevealedTokens(new Set())
     } catch (err) {
       console.error('Error fetching invitations:', err)
       setError('Failed to load invitations')
@@ -119,6 +122,27 @@ export default function UsersPage() {
     }
   }
 
+  // Close modal and reset token
+  const handleCloseModal = () => {
+    setShowToken(null)
+  }
+
+  // Handle copy token
+  const handleCopyToken = (token: string) => {
+    navigator.clipboard.writeText(token)
+  }
+
+  // Handle token visibility
+  const handleTokenVisibility = (id: string, isCurrentlyRevealed: boolean) => {
+    const newRevealedTokens = new Set(revealedTokens)
+    if (isCurrentlyRevealed) {
+      newRevealedTokens.delete(id)
+    } else {
+      newRevealedTokens.add(id)
+    }
+    setRevealedTokens(newRevealedTokens)
+  }
+
   if (loading) {
     return (
       <div className="p-8">
@@ -158,7 +182,7 @@ export default function UsersPage() {
                 <span className="text-gray-400">@</span>
               </div>
             </div>
-            <p className="mt-1 text-xs text-gray-500">The invitation will be sent to this email address</p>
+            <p className="mt-1 text-xs text-gray-500">You'll need to share the invitation token with this user manually</p>
           </div>
           
           {/* Role Selection */}
@@ -240,7 +264,7 @@ export default function UsersPage() {
                 Copy Token
               </button>
               <button
-                onClick={() => setShowToken(null)}
+                onClick={handleCloseModal}
                 className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
               >
                 Close
@@ -262,6 +286,9 @@ export default function UsersPage() {
                 Role
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Token
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -276,6 +303,7 @@ export default function UsersPage() {
             {invitations.map(invitation => {
               const isExpired = new Date(invitation.expires_at) < new Date()
               const isUsed = Boolean(invitation.used_at)
+              const isRevealed = revealedTokens.has(invitation.id)
               
               return (
                 <tr key={invitation.id}>
@@ -292,6 +320,25 @@ export default function UsersPage() {
                     }`}>
                       {invitation.role}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-mono text-sm">
+                        {isRevealed ? invitation.token : '••••••••'}
+                      </span>
+                      <button
+                        onClick={() => handleTokenVisibility(invitation.id, isRevealed)}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        {isRevealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                      <button
+                        onClick={() => handleCopyToken(invitation.token)}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
