@@ -240,6 +240,16 @@ export const ActionButton = {
     >
       {loading ? 'Loading...' : children}
     </Button>
+  ),
+
+  reopen: ({ onClick, loading, children }: { onClick: (e: React.MouseEvent) => void, loading?: boolean, children: React.ReactNode }) => (
+    <Button
+      onClick={onClick}
+      disabled={loading}
+      variant="success"
+    >
+      {loading ? 'Loading...' : children}
+    </Button>
   )
 }
 

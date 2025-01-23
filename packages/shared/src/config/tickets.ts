@@ -1,5 +1,5 @@
 export type TicketPriority = 'low' | 'medium' | 'high' | 'urgent'
-export type TicketStatus = 'new' | 'in_progress' | 'resolved' | 'closed' | 'cancelled'
+export type TicketStatus = 'new' | 'in_progress' | 'closed' | 'cancelled'
 
 export const TICKET_PRIORITIES: {
   value: TicketPriority
@@ -57,15 +57,9 @@ export const TICKET_STATUSES: {
     description: 'Ticket is being worked on'
   },
   {
-    value: 'resolved',
-    label: 'Resolved',
-    color: 'bg-green-100 text-green-800',
-    description: 'Issue has been resolved'
-  },
-  {
     value: 'closed',
     label: 'Closed',
-    color: 'bg-gray-100 text-gray-800',
+    color: 'bg-green-100 text-green-800',
     description: 'Ticket has been closed'
   },
   {

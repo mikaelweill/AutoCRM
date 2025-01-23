@@ -5,7 +5,7 @@ import { useAuth } from "shared/src/contexts/AuthContext"
 import { CreateTicketForm } from 'shared/src/components/tickets/CreateTicketForm'
 import { ActionButton } from 'shared/src/components/tickets/TicketTemplate'
 import { TicketList } from 'shared/src/components/tickets/TicketList'
-import { Ticket, getTickets, cancelTicket, getAttachmentUrl } from 'shared/src/services/tickets'
+import { Ticket, getTickets, cancelTicket, reopenTicket, getAttachmentUrl } from 'shared/src/services/tickets'
 import { TICKET_PRIORITIES } from 'shared/src/config/tickets'
 
 export default function MyNewTicketsPage() {
@@ -14,6 +14,7 @@ export default function MyNewTicketsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isCancelling, setIsCancelling] = useState<string | null>(null)
+  const [isReopening, setIsReopening] = useState<string | null>(null)
 
   useEffect(() => {
     fetchTickets()
@@ -49,6 +50,19 @@ export default function MyNewTicketsPage() {
     }
   }
 
+  const handleReopenTicket = async (ticketId: string) => {
+    try {
+      setIsReopening(ticketId)
+      await reopenTicket(ticketId)
+      await fetchTickets()
+    } catch (err) {
+      console.error('Error reopening ticket:', err)
+      setError('Failed to reopen ticket')
+    } finally {
+      setIsReopening(null)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="h-full overflow-auto">
@@ -79,14 +93,26 @@ export default function MyNewTicketsPage() {
             priorities: TICKET_PRIORITIES.map(p => p.value)
           }}
           renderHeader={<h1 className="text-2xl font-semibold">My Tickets (New)</h1>}
-          renderActions={ticket => (
-            <ActionButton.cancel
-              onClick={() => handleCancelTicket(ticket.id)}
-              loading={isCancelling === ticket.id}
-            >
-              {isCancelling === ticket.id ? 'Cancelling...' : 'Cancel'}
-            </ActionButton.cancel>
-          )}
+          renderActions={ticket => {
+            if (ticket.status === 'closed' || ticket.status === 'cancelled') {
+              return (
+                <ActionButton.reopen
+                  onClick={() => handleReopenTicket(ticket.id)}
+                  loading={isReopening === ticket.id}
+                >
+                  {isReopening === ticket.id ? 'Reopening...' : 'Reopen'}
+                </ActionButton.reopen>
+              )
+            }
+            return (
+              <ActionButton.cancel
+                onClick={() => handleCancelTicket(ticket.id)}
+                loading={isCancelling === ticket.id}
+              >
+                {isCancelling === ticket.id ? 'Cancelling...' : 'Cancel'}
+              </ActionButton.cancel>
+            )
+          }}
           renderCreateForm={
             <CreateTicketForm
               onSuccess={handleCreateTicket}

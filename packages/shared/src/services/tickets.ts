@@ -975,4 +975,85 @@ export async function getUnassignedTickets(): Promise<Ticket[]> {
   })
 
   return validTickets
+}
+
+export async function reopenTicket(ticketId: string): Promise<Ticket> {
+  const supabase = createClient()
+  
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) {
+    throw new Error('User must be logged in to reopen ticket')
+  }
+
+  // First verify the ticket exists and belongs to the user
+  const { data: existingTicket, error: fetchError } = await supabase
+    .from('tickets')
+    .select(`
+      *,
+      client:client_id(id, email, full_name, role),
+      agent:agent_id(id, email, full_name, role),
+      attachments(
+        id,
+        file_name,
+        file_type,
+        file_size,
+        storage_path,
+        created_at
+      )
+    `)
+    .eq('id', ticketId)
+    .eq('client_id', user.id)
+    .single()
+
+  if (fetchError || !existingTicket) {
+    throw new Error('Ticket not found or access denied')
+  }
+
+  if (!isTicket(existingTicket)) {
+    throw new Error('Invalid ticket data received')
+  }
+
+  // Perform the update
+  const { error: updateError } = await supabase
+    .from('tickets')
+    .update({ 
+      status: 'new',
+      updated_at: new Date().toISOString(),
+      agent_id: null // Remove agent assignment when reopening
+    })
+    .eq('id', ticketId)
+    .eq('client_id', user.id)
+
+  if (updateError) {
+    throw updateError
+  }
+
+  // Fetch the updated ticket
+  const { data: updatedTicket, error: refetchError } = await supabase
+    .from('tickets')
+    .select(`
+      *,
+      client:client_id(id, email, full_name, role),
+      agent:agent_id(id, email, full_name, role),
+      attachments(
+        id,
+        file_name,
+        file_type,
+        file_size,
+        storage_path,
+        created_at
+      )
+    `)
+    .eq('id', ticketId)
+    .single()
+
+  if (refetchError || !updatedTicket) {
+    throw new Error('Failed to fetch updated ticket')
+  }
+
+  if (!isTicket(updatedTicket)) {
+    throw new Error('Invalid updated ticket data received')
+  }
+
+  return updatedTicket
 } 
