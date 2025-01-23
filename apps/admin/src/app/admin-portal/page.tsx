@@ -58,7 +58,64 @@ export default function AdminPortal() {
 
   useEffect(() => {
     fetchDashboardData()
-  }, [])
+
+    // Set up real-time subscriptions
+    const ticketsChannel = supabase
+      .channel('tickets-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tickets'
+        },
+        () => {
+          console.log('Tickets updated, refreshing stats...')
+          fetchDashboardData()
+        }
+      )
+      .subscribe()
+
+    const activitiesChannel = supabase
+      .channel('activities-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'ticket_activities'
+        },
+        () => {
+          console.log('New activity detected, refreshing activities...')
+          fetchDashboardData()
+        }
+      )
+      .subscribe()
+
+    const usersChannel = supabase
+      .channel('users-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'users',
+          filter: 'role=eq.agent'
+        },
+        () => {
+          console.log('Agent data updated, refreshing stats...')
+          fetchDashboardData()
+        }
+      )
+      .subscribe()
+
+    // Cleanup subscriptions
+    return () => {
+      supabase.removeChannel(ticketsChannel)
+      supabase.removeChannel(activitiesChannel)
+      supabase.removeChannel(usersChannel)
+    }
+  }, []) // Empty dependency array since supabase client is stable
 
   async function fetchDashboardData() {
     try {
@@ -356,16 +413,19 @@ export default function AdminPortal() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Activity
+                  ID
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ticket
+                  Actor
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Client
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  User
+                  Title
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Activity
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Time
@@ -375,13 +435,13 @@ export default function AdminPortal() {
             <tbody className="bg-white divide-y divide-gray-200">
               {activities.map(activity => (
                 <tr key={activity.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <p className="text-sm text-gray-900">{activity.content}</p>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {activity.ticket.number}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm">
-                      <div className="font-medium text-gray-900">#{activity.ticket.number}</div>
-                      <div className="text-gray-500">{activity.ticket.subject}</div>
+                      <div className="font-medium text-gray-900">{activity.user.name}</div>
+                      <div className="text-gray-500">{activity.user.role}</div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -390,11 +450,11 @@ export default function AdminPortal() {
                       <div className="text-gray-500">{activity.ticket.client.email}</div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm">
-                      <div className="font-medium text-gray-900">{activity.user.name}</div>
-                      <div className="text-gray-500">{activity.user.role}</div>
-                    </div>
+                  <td className="px-6 py-4">
+                    <div className="text-sm text-gray-900 max-w-md break-words">{activity.ticket.subject}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-sm text-gray-900">{activity.content}</p>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(activity.timestamp).toLocaleString()}
