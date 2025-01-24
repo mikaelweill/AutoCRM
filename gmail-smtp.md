@@ -1,80 +1,68 @@
 # Gmail Integration with SMTP/IMAP
 
-## Current Progress
+## Current Progress ✅
 
-### 1. Gmail Account Configuration ✅
-- Set up Gmail account: `autocrm.sys@gmail.com`
-- Generated App Password
-- Added to Supabase environment variables
+### Setup
+- Gmail account configured (autocrm.sys@gmail.com)
+- 2FA enabled and App Password generated
+- Environment variables set in Supabase (`GMAIL_APP_PASSWORD`)
 
-### 2. Email Sending (SMTP) ✅
-- Created Edge Function `gmail-smtp`
-- Implemented email sending using nodemailer
-- Basic features working:
-  - Send plain text emails
-  - HTML support ready
-  - Successfully tested
+### Implemented Features
+1. **SMTP (Email Sending)** ✅
+   - Edge Function: `gmail-smtp`
+   - Uses `nodemailer` library
+   - Can send emails with subjects, body text
+   - Support for priority tags (#high, #medium, #low)
+
+2. **IMAP (Email Reading)** ✅
+   - Edge Function: `gmail-imap`
+   - Uses `imapflow` library
+   - Can read unread emails from inbox
+   - Extracts all relevant metadata (subject, from, date, messageId)
+   - Parses priority tags from email content
+
+### Key Learnings
+- App Password approach is simpler than OAuth
+- Both SMTP and IMAP work well with Edge Functions
+- Can handle email threading via messageId and inReplyTo fields
+- Priority tags can be extracted from email content
 
 ## Vision: Email-Based Ticket System
 
-### 1. Ticket Creation via Email
-- Clients send emails to `autocrm.sys@gmail.com`
-- System automatically:
-  - Creates new ticket
-  - Extracts subject as ticket title
-  - Uses email body as description
-  - Parses hashtags for priority (#low, #medium, #high)
-  - Records email source for threading
+### Ticket Creation Flow
+1. Customer sends email to autocrm.sys@gmail.com
+2. IMAP function detects new email
+3. System creates ticket with:
+   - Priority from hashtags or default
+   - Customer info from email
+   - Full email content in ticket body
+4. Auto-response sent via SMTP confirming receipt
 
-### 2. Ticket Updates via Email
-- Any ticket activity triggers email notifications
-- Email threading maintains conversation history
-- Responses from either side update the ticket
+### Ticket Updates
+1. Customer replies to ticket email
+2. System matches reply to existing ticket via messageId
+3. Updates ticket with new information
+4. Notifies assigned agent
 
-### Required Changes
+## Required Changes
+1. Database Schema Updates
+   - Add email_thread_id to tickets table
+   - Add email_metadata for threading
+   - Store customer email addresses
 
-#### 1. Database Schema Updates
-- Add to tickets table:
-  ```sql
-  - email_thread_id: For tracking email conversations
-  - source: 'email' | 'web' | 'api'
-  - email_metadata: JSON with email details
-  ```
-
-#### 2. Email Processing Features Needed
-- [ ] IMAP integration for reading emails
-- [ ] Email parsing logic:
-  - Extract priority tags
-  - Handle email threading
-  - Process attachments
-- [ ] Email template system for responses
-
-#### 3. Integration Points
-- [ ] Email → Ticket creation flow
-- [ ] Ticket → Email notification flow
-- [ ] Reply → Ticket update flow
+2. Email Processing Features
+   - Auto-categorization based on content
+   - Priority detection from email text
+   - Customer information extraction
+   - Thread matching for updates
 
 ## Next Steps
-
-1. Add IMAP Functionality
-   - Set up email reading
-   - Implement webhook for new emails
-   - Parse email content and metadata
-
-2. Enhance SMTP Features
-   - Add HTML templates
-   - Support attachments
-   - Handle CC/BCC
-
-3. Create Email Processing System
-   - Priority tag parsing
-   - Email thread tracking
-   - Template management
-
-4. Update Database Schema
-   - Add email-related fields
-   - Create email templates table
-   - Set up threading relationships
+1. [ ] Create ticket creation endpoint that uses both IMAP/SMTP
+2. [ ] Update database schema for email integration
+3. [ ] Implement auto-response templates
+4. [ ] Add email thread tracking
+5. [ ] Set up periodic email checking
+6. [ ] Add email validation and spam filtering
 
 ## Technical Details
 
