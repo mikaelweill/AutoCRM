@@ -16,14 +16,14 @@ const corsHeaders = {
 }
 
 interface EmailMessage {
-  subject: string
-  from: string
-  text: string
-  html?: string
-  date: Date
-  priority?: string  // Extracted from hashtags
   messageId: string
   inReplyTo?: string
+  from: string
+  to: string
+  subject: string
+  body: string
+  priority?: 'high' | 'medium' | 'low'
+  receivedAt: Date
 }
 
 serve(async (req: Request) => {
@@ -38,8 +38,8 @@ serve(async (req: Request) => {
     const path = url.pathname.split('/').pop();
 
     switch (path) {
-      case 'read':
-        if (req.method !== 'GET') {
+      case 'check':
+        if (req.method !== 'POST') {
           return new Response('Method not allowed', { 
             status: 405,
             headers: corsHeaders 
@@ -64,8 +64,9 @@ serve(async (req: Request) => {
         const emails: EmailMessage[] = [];
         
         try {
-          // First search for unseen messages
+          // First search for unread messages
           const list = await client.search({ unseen: true });
+          console.log(`Found ${list.length} unread messages`);
           
           // Then fetch each message
           for (const seq of list) {
@@ -74,22 +75,25 @@ serve(async (req: Request) => {
               envelope: true
             });
             
-            const email: Partial<EmailMessage> = {
-              subject: message.envelope.subject,
-              from: message.envelope.from?.[0].address,
-              text: message.source?.toString() || '',
-              date: message.envelope.date,
+            // Extract priority from subject or body
+            const priorityMatch = message.source?.toString().match(/#(high|medium|low)/i);
+            const priority = priorityMatch ? priorityMatch[1].toLowerCase() as 'high' | 'medium' | 'low' : undefined;
+
+            const email: EmailMessage = {
               messageId: message.envelope.messageId,
-              inReplyTo: message.envelope.inReplyTo?.[0]
+              inReplyTo: message.envelope.inReplyTo?.[0],
+              from: message.envelope.from?.[0].address,
+              to: message.envelope.to?.[0].address,
+              subject: message.envelope.subject,
+              body: message.source?.toString() || '',
+              priority,
+              receivedAt: message.envelope.date
             };
 
-            // Extract priority from hashtags
-            const priorityMatch = email.text?.match(/#(high|medium|low)/i);
-            if (priorityMatch) {
-              email.priority = priorityMatch[1].toLowerCase();
-            }
+            emails.push(email);
 
-            emails.push(email as EmailMessage);
+            // Mark as seen
+            await client.messageFlagsAdd(seq, ['\\Seen']);
           }
         } finally {
           // Always release the lock
@@ -101,6 +105,7 @@ serve(async (req: Request) => {
 
         return new Response(JSON.stringify({ 
           success: true,
+          count: emails.length,
           emails
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

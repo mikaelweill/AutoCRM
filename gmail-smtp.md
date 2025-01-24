@@ -2,30 +2,85 @@
 
 ## Current Progress ✅
 
-### Setup
-- Gmail account configured (autocrm.sys@gmail.com)
-- 2FA enabled and App Password generated
-- Environment variables set in Supabase (`GMAIL_APP_PASSWORD`)
+### Database Schema
+1. **Tickets Table Updates**
+   - Added `source` column (default: 'web')
+   - Existing tickets backfilled as 'web'
+   - Uses existing fields for content and attachments
+
+2. **New Ticket Emails Table**
+   - Tracks email metadata for threading
+   - Links emails to tickets
+   - Fields:
+     ```sql
+     - message_id (for threading)
+     - in_reply_to (for replies)
+     - from_email/to_email
+     - subject
+     - direction (inbound/outbound)
+     ```
 
 ### Implemented Features
 1. **SMTP (Email Sending)** ✅
    - Edge Function: `gmail-smtp`
-   - Uses `nodemailer` library
+   - Uses `nodemailer`
    - Can send emails with subjects, body text
    - Support for priority tags (#high, #medium, #low)
 
 2. **IMAP (Email Reading)** ✅
    - Edge Function: `gmail-imap`
-   - Uses `imapflow` library
+   - Uses `imapflow`
    - Can read unread emails from inbox
-   - Extracts all relevant metadata (subject, from, date, messageId)
-   - Parses priority tags from email content
+   - Extracts metadata and content
 
-### Key Learnings
-- App Password approach is simpler than OAuth
-- Both SMTP and IMAP work well with Edge Functions
-- Can handle email threading via messageId and inReplyTo fields
-- Priority tags can be extracted from email content
+## Email Processing Implementation
+
+### Phase 1: Manual Polling (Current) ✅
+1. **Manual Check Button**
+   - Available to agents and admins
+   - Instant email check when clicked
+   - Perfect for testing and demos
+   - Endpoint: `POST /functions/v1/gmail-imap/check`
+
+2. **Processing Flow**
+   - Agent clicks "Check New Emails"
+   - System checks for unread emails
+   - Creates/updates tickets as needed
+   - Provides immediate feedback
+
+3. **Benefits**
+   - Full control over timing
+   - Easier testing and debugging
+   - Instant results when needed
+   - No scheduling complexity
+
+### Phase 2: Automation (Future)
+Options to consider:
+1. GitHub Actions (every X minutes)
+2. Supabase Cron (hourly)
+3. Self-scheduling function
+4. Gmail webhooks
+
+## Next Implementation Steps
+1. [ ] Add "Check New Emails" button to UI
+2. [ ] Implement email to ticket creation
+3. [ ] Set up auto-responses
+4. [ ] Add email threading support
+5. [ ] Test various email scenarios
+
+## Processing Flow
+1. Manual trigger from UI
+2. Check message_id:
+   - New thread → Create ticket
+   - Existing thread → Update ticket
+3. Store email metadata in ticket_emails
+4. Send auto-response if new ticket
+5. Notify assigned agent
+
+Would you like to proceed with:
+1. Adding the check endpoint to IMAP function
+2. Creating the UI button component
+3. Implementing the ticket creation logic
 
 ## Vision: Email-Based Ticket System
 
@@ -56,14 +111,6 @@
    - Customer information extraction
    - Thread matching for updates
 
-## Next Steps
-1. [ ] Create ticket creation endpoint that uses both IMAP/SMTP
-2. [ ] Update database schema for email integration
-3. [ ] Implement auto-response templates
-4. [ ] Add email thread tracking
-5. [ ] Set up periodic email checking
-6. [ ] Add email validation and spam filtering
-
 ## Technical Details
 
 ### Current SMTP Implementation
@@ -93,9 +140,4 @@
 - Update notifications
 - Status change alerts
 - Assignment notifications
-```
-
-Would you like to start with:
-1. Adding IMAP functionality for reading emails?
-2. Updating the database schema?
-3. Something else? 
+``` 
