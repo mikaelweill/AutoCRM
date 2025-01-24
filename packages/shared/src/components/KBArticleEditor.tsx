@@ -6,7 +6,7 @@ import { Textarea } from './ui/Textarea'
 type KBArticle = Database['public']['Tables']['knowledge_base_articles']['Row']
 
 interface KBArticleEditorProps {
-  article: KBArticle
+  article?: KBArticle
   onSave: (updatedArticle: Partial<KBArticle>) => Promise<void>
   onCancel: () => void
 }
@@ -16,19 +16,24 @@ export function KBArticleEditor({
   onSave,
   onCancel 
 }: KBArticleEditorProps) {
-  const [title, setTitle] = useState(article.title)
-  const [content, setContent] = useState(article.content)
-  const [category, setCategory] = useState(article.category)
-  const [isPublished, setIsPublished] = useState(article.is_published)
+  const [title, setTitle] = useState(article?.title ?? '')
+  const [content, setContent] = useState(article?.content ?? '')
+  const [category, setCategory] = useState(article?.category ?? '')
+  const [isPublished, setIsPublished] = useState(article?.is_published ?? false)
   const [isSaving, setIsSaving] = useState(false)
 
   const handleSave = async () => {
+    if (!title.trim()) {
+      alert('Title is required')
+      return
+    }
+
     try {
       setIsSaving(true)
       await onSave({
-        title,
-        content,
-        category,
+        title: title.trim(),
+        content: content.trim(),
+        category: category.trim(),
         is_published: isPublished
       })
     } finally {
@@ -89,7 +94,7 @@ export function KBArticleEditor({
             disabled={isSaving}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm disabled:opacity-50"
           >
-            {isSaving ? 'Saving...' : 'Save Changes'}
+            {isSaving ? 'Saving...' : article ? 'Save Changes' : 'Create Article'}
           </button>
         </div>
       </CardContent>

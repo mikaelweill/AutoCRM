@@ -9,6 +9,21 @@ interface KBArticleViewerProps {
   onEdit?: () => void
 }
 
+function renderFormattedText(text: string) {
+  // Split the text into segments based on bold markers (**)
+  const segments = text.split(/(\*\*.*?\*\*)/g)
+  
+  return segments.map((segment, index) => {
+    // Check if this segment is bold (wrapped in **)
+    if (segment.startsWith('**') && segment.endsWith('**')) {
+      // Remove the ** markers and wrap in strong tag
+      return <strong key={index}>{segment.slice(2, -2)}</strong>
+    }
+    // Return regular text
+    return <span key={index}>{segment}</span>
+  })
+}
+
 export function KBArticleViewer({ 
   article, 
   isEditable = false,
@@ -47,7 +62,7 @@ export function KBArticleViewer({
           {/* We'll want to render this as markdown eventually */}
           {article.content.split('\n').map((paragraph, index) => (
             <p key={index} className="mb-4">
-              {paragraph}
+              {renderFormattedText(paragraph)}
             </p>
           ))}
         </div>

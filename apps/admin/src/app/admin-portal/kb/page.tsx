@@ -7,6 +7,7 @@ import { Database } from 'shared/src/types/database'
 import { Dialog } from 'shared/src/components/ui/Dialog'
 import { KBArticleViewer } from 'shared/src/components/KBArticleViewer'
 import { KBArticleEditor } from 'shared/src/components/KBArticleEditor'
+import { useAuth } from 'shared/src/contexts/AuthContext'
 
 type KBArticle = Database['public']['Tables']['knowledge_base_articles']['Row']
 
@@ -16,8 +17,10 @@ export default function KBPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedArticle, setSelectedArticle] = useState<KBArticle | null>(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
   
   const supabase = createClient()
+  const { user } = useAuth()
 
   useEffect(() => {
     fetchArticles()
@@ -41,8 +44,7 @@ export default function KBPage() {
   }
 
   const handleNewArticle = () => {
-    // TODO: Implement new article creation
-    console.log('New article clicked')
+    setIsCreating(true)
   }
 
   const handleArticleClick = (article: KBArticle) => {
@@ -55,17 +57,28 @@ export default function KBPage() {
   }
 
   const handleSaveArticle = async (updatedArticle: Partial<KBArticle>) => {
-    if (!selectedArticle) return
+    if (!selectedArticle || !user) return
 
     try {
       const { data, error } = await supabase
         .from('knowledge_base_articles')
-        .update(updatedArticle)
+        .update({
+          ...updatedArticle,
+          updated_at: new Date().toISOString(),
+          last_updated_by: user.id
+        })
         .eq('id', selectedArticle.id)
         .select<'*', KBArticle>('*')
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Error updating article:', error)
+        throw new Error(error.message)
+      }
+
+      if (!data) {
+        throw new Error('No data returned after update')
+      }
 
       // Update the articles list with the updated article
       setArticles(articles.map(article => 
@@ -77,12 +90,53 @@ export default function KBPage() {
       setIsEditing(false)
     } catch (err) {
       console.error('Error updating article:', err)
-      alert('Failed to update article')
+      alert(err instanceof Error ? err.message : 'Failed to update article')
+    }
+  }
+
+  const handleCreateArticle = async (newArticle: Partial<KBArticle>) => {
+    if (!user) return
+
+    try {
+      const { data, error } = await supabase
+        .from('knowledge_base_articles')
+        .insert({
+          ...newArticle,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          created_by: user.id,
+          last_updated_by: user.id,
+          metadata: {}
+        })
+        .select<'*', KBArticle>('*')
+        .single()
+
+      if (error) {
+        console.error('Error creating article:', error)
+        throw new Error(error.message)
+      }
+
+      if (!data) {
+        throw new Error('No data returned after insert')
+      }
+
+      // Add the new article to the list
+      setArticles([data, ...articles])
+
+      // Close the create dialog
+      setIsCreating(false)
+    } catch (err) {
+      console.error('Error creating article:', err)
+      alert(err instanceof Error ? err.message : 'Failed to create article')
     }
   }
 
   const handleCancelEdit = () => {
     setIsEditing(false)
+  }
+
+  const handleCancelCreate = () => {
+    setIsCreating(false)
   }
 
   return (
@@ -96,6 +150,7 @@ export default function KBPage() {
         onArticleClick={handleArticleClick}
       />
 
+      {/* Article View/Edit Dialog */}
       {selectedArticle && (
         <Dialog 
           isOpen={true}
@@ -122,6 +177,20 @@ export default function KBPage() {
           </div>
         </Dialog>
       )}
+
+      {/* Create Article Dialog */}
+      <Dialog
+        isOpen={isCreating}
+        onClose={handleCancelCreate}
+        title="Create New Article"
+      >
+        <div className="max-w-4xl mx-auto">
+          <KBArticleEditor
+            onSave={handleCreateArticle}
+            onCancel={handleCancelCreate}
+          />
+        </div>
+      </Dialog>
     </>
   )
 } 
