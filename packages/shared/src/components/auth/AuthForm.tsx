@@ -71,7 +71,12 @@ export function AuthForm({
         email,
         password,
       })
-      if (error) throw error
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Incorrect email or password')
+        }
+        throw error
+      }
     } catch (err) {
       console.error('Error during sign in:', err)
       setError(err instanceof Error ? err.message : 'An error occurred during sign in')
@@ -91,12 +96,23 @@ export function AuthForm({
         const result = await signUpWithToken(email, password, token)
         
         if (result.error) {
-          setError(result.error)
+          // Improve token error messages with more user-friendly language
+          if (result.error.includes('Invalid invitation token') || result.error.includes('not found')) {
+            setError('The email address and invitation token do not match. Please check both and try again')
+          } else if (result.error.includes('Invitation token has expired')) {
+            setError('This invitation has expired. Please request a new invitation')
+          } else if (result.error.includes('already been used')) {
+            setError('This invitation has already been used. Please request a new invitation')
+          } else if (result.error.includes('can only be used on')) {
+            setError('You are using this invitation on the wrong portal. Please check the invitation email for the correct link')
+          } else {
+            setError('There was a problem with your invitation. Please check your email and token or contact support')
+          }
           return
         }
 
         setError(null)
-        setSuccess('Sign up successful! Please check your email for confirmation.')
+        setSuccess('Sign up successful! You can now sign in')
         
         // Reset form
         setEmail('')
@@ -116,12 +132,16 @@ export function AuthForm({
       const result = await signUpClient(email, password)
       
       if (result.error) {
-        setError(result.error)
+        if (result.error.includes('already registered')) {
+          setError('An account with this email already exists')
+        } else {
+          setError(result.error)
+        }
         return
       }
 
       setError(null)
-      setSuccess('Sign up successful! Please check your email for confirmation.')
+      setSuccess('Sign up successful! You can now sign in')
       
       // Reset form
       setEmail('')
