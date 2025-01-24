@@ -7,13 +7,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { corsHeaders } from '../_shared/cors.ts'
 
 console.log("Hello from Functions!")
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
 
 interface EmailMessage {
   messageId: string
@@ -22,14 +18,75 @@ interface EmailMessage {
   to: string
   subject: string
   body: string
-  priority?: 'high' | 'medium' | 'low'
+  priority?: 'low' | 'medium' | 'high' | 'urgent'
   receivedAt: Date
+  attachments?: Array<{
+    filename: string
+    content: Uint8Array
+    contentType: string
+  }>
 }
 
 // Initialize Supabase client
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || ''
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+async function findUserByEmail(email: string) {
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', email)
+    .single()
+  
+  if (error) throw new Error(`Error finding user: ${error.message}`)
+  return user
+}
+
+async function createTicketFromEmail(email: EmailMessage) {
+  // Find user by email
+  const user = await findUserByEmail(email.from)
+  if (!user) {
+    console.log(`Skipping email from unknown user: ${email.from}`)
+    return null
+  }
+
+  // Start a transaction
+  const { data: ticket, error: ticketError } = await supabase
+    .from('tickets')
+    .insert({
+      client_id: user.id,
+      subject: email.subject,
+      description: email.body,
+      priority: email.priority || 'medium',
+      status: 'new',
+      source: 'email',
+      created_at: email.receivedAt,
+      updated_at: email.receivedAt
+    })
+    .select()
+    .single()
+
+  if (ticketError) throw new Error(`Error creating ticket: ${ticketError.message}`)
+
+  // Save email metadata
+  const { error: emailError } = await supabase
+    .from('ticket_emails')
+    .insert({
+      ticket_id: ticket.id,
+      message_id: email.messageId,
+      in_reply_to: email.inReplyTo,
+      from_email: email.from,
+      to_email: email.to,
+      subject: email.subject,
+      direction: 'inbound',
+      received_at: email.receivedAt
+    })
+
+  if (emailError) throw new Error(`Error saving email metadata: ${emailError.message}`)
+
+  return ticket
+}
 
 serve(async (req: Request) => {
   // Handle CORS
@@ -38,156 +95,47 @@ serve(async (req: Request) => {
   }
 
   try {
-    // 1. Fetch new emails
-    const response = await fetch(
-      `${supabaseUrl}/functions/v1/gmail-imap/check`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${supabaseAnonKey}`,
-        }
+    // Call the IMAP check endpoint
+    const imapResponse = await fetch(`${supabaseUrl}/functions/v1/gmail-imap/check`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${supabaseServiceKey}`,
+        'Content-Type': 'application/json'
       }
-    )
+    })
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch emails')
+    if (!imapResponse.ok) {
+      throw new Error(`IMAP check failed: ${await imapResponse.text()}`)
     }
 
-    const { emails } = await response.json()
-    const results = []
+    const { emails = [] } = await imapResponse.json()
+    console.log(`Processing ${emails.length} new emails`)
 
-    // 2. Process each email
+    const results = []
     for (const email of emails) {
       try {
-        // Check if this is a reply to existing ticket
-        const { data: existingEmail } = await supabase
-          .from('ticket_emails')
-          .select('ticket_id')
-          .eq('message_id', email.inReplyTo)
-          .single()
-
-        if (existingEmail) {
-          // Update existing ticket
-          const { data: ticket } = await supabase
-            .from('tickets')
-            .select('*')
-            .eq('id', existingEmail.ticket_id)
-            .single()
-
-          if (ticket) {
-            // Add comment to ticket
-            const { data: comment } = await supabase
-              .from('ticket_comments')
-              .insert({
-                ticket_id: ticket.id,
-                content: email.body,
-                author_id: ticket.client_id // Since it's from client
-              })
-              .select()
-              .single()
-
-            // Save email metadata
-            const { data: emailRecord } = await supabase
-              .from('ticket_emails')
-              .insert({
-                ticket_id: ticket.id,
-                message_id: email.messageId,
-                in_reply_to: email.inReplyTo,
-                from_email: email.from,
-                to_email: email.to,
-                subject: email.subject,
-                direction: 'inbound',
-                received_at: email.receivedAt
-              })
-              .select()
-              .single()
-
-            results.push({
-              type: 'update',
-              ticket_id: ticket.id,
-              comment_id: comment?.id,
-              email_id: emailRecord?.id
-            })
-          }
-        } else {
-          // Create new ticket
-          const { data: client } = await supabase
-            .from('clients')
-            .select('id')
-            .eq('email', email.from)
-            .single()
-
-          // If client doesn't exist, create one
-          let clientId = client?.id
-          if (!clientId) {
-            const { data: newClient } = await supabase
-              .from('clients')
-              .insert({
-                email: email.from,
-                name: email.from.split('@')[0] // Use email username as temp name
-              })
-              .select()
-              .single()
-            
-            clientId = newClient?.id
-          }
-
-          if (clientId) {
-            // Create ticket
-            const { data: ticket } = await supabase
-              .from('tickets')
-              .insert({
-                title: email.subject,
-                description: email.body,
-                client_id: clientId,
-                priority: email.priority || 'medium',
-                status: 'new',
-                source: 'email'
-              })
-              .select()
-              .single()
-
-            if (ticket) {
-              // Save email metadata
-              const { data: emailRecord } = await supabase
-                .from('ticket_emails')
-                .insert({
-                  ticket_id: ticket.id,
-                  message_id: email.messageId,
-                  in_reply_to: email.inReplyTo,
-                  from_email: email.from,
-                  to_email: email.to,
-                  subject: email.subject,
-                  direction: 'inbound',
-                  received_at: email.receivedAt
-                })
-                .select()
-                .single()
-
-              results.push({
-                type: 'create',
-                ticket_id: ticket.id,
-                email_id: emailRecord?.id
-              })
-
-              // TODO: Send auto-response
-            }
-          }
+        const ticket = await createTicketFromEmail(email)
+        if (ticket) {
+          results.push({
+            success: true,
+            emailId: email.messageId,
+            ticketId: ticket.id,
+            ticketNumber: ticket.number
+          })
         }
       } catch (error) {
-        console.error('Error processing email:', error)
+        console.error(`Error processing email ${email.messageId}:`, error)
         results.push({
-          type: 'error',
-          email: email.messageId,
-          error: error instanceof Error ? error.message : 'Unknown error'
+          success: false,
+          emailId: email.messageId,
+          error: error instanceof Error ? error.message : String(error)
         })
       }
     }
 
     return new Response(
       JSON.stringify({
-        success: true,
-        processed: results.length,
+        processed: emails.length,
         results
       }),
       {
@@ -200,7 +148,7 @@ serve(async (req: Request) => {
     console.error('Error:', error)
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : String(error)
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

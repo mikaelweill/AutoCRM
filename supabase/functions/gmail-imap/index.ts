@@ -22,7 +22,7 @@ interface EmailMessage {
   to: string
   subject: string
   body: string
-  priority?: 'high' | 'medium' | 'low'
+  priority?: 'low' | 'medium' | 'high' | 'urgent'
   receivedAt: Date
 }
 
@@ -76,8 +76,47 @@ serve(async (req: Request) => {
             });
             
             // Extract priority from subject or body
-            const priorityMatch = message.source?.toString().match(/#(high|medium|low)/i);
-            const priority = priorityMatch ? priorityMatch[1].toLowerCase() as 'high' | 'medium' | 'low' : undefined;
+            const priorityMatch = message.source?.toString().match(/#(urgent|high|medium|low)/i);
+            const priority = priorityMatch ? priorityMatch[1].toLowerCase() as 'urgent' | 'high' | 'medium' | 'low' : undefined;
+
+            // Parse email content
+            const source = message.source?.toString() || '';
+            let body = '';
+
+            // Try multiple patterns to extract the body
+            // 1. Try to find the plain text part between boundaries
+            const boundaryMatch = source.match(/boundary="([^"]+)"/);
+            if (boundaryMatch) {
+              const boundary = boundaryMatch[1];
+              const parts = source.split(`--${boundary}`);
+              
+              // Look for the plain text part
+              for (const part of parts) {
+                if (part.includes('Content-Type: text/plain')) {
+                  const contentMatch = part.split(/\r?\n\r?\n/);
+                  if (contentMatch.length > 1) {
+                    body = contentMatch.slice(1).join('\n\n');
+                    break;
+                  }
+                }
+              }
+            }
+
+            // 2. Fallback: try to find content after headers if no boundary found
+            if (!body) {
+              const parts = source.split(/\r?\n\r?\n/);
+              if (parts.length > 1) {
+                body = parts.slice(1).join('\n\n');
+              }
+            }
+
+            // Clean up the body
+            body = body
+              .replace(/--[^-]+--/g, '') // Remove any remaining boundaries
+              .replace(/=\r?\n/g, '') // Remove soft line breaks
+              .replace(/=([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16))) // Handle quoted-printable
+              .replace(/\r?\n\s*#(urgent|high|medium|low)/i, '\n#$1') // Clean up priority tags
+              .trim();
 
             const email: EmailMessage = {
               messageId: message.envelope.messageId,
@@ -85,7 +124,7 @@ serve(async (req: Request) => {
               from: message.envelope.from?.[0].address,
               to: message.envelope.to?.[0].address,
               subject: message.envelope.subject,
-              body: message.source?.toString() || '',
+              body,
               priority,
               receivedAt: message.envelope.date
             };
