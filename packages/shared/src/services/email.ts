@@ -1,18 +1,22 @@
 import { createClient } from '@supabase/supabase-js'
 import { env } from '../config/env'
 
-interface EmailCheckResult {
-  processed: number
-  results: Array<{
-    success: boolean
-    emailId: string
-    ticketId?: string
-    ticketNumber?: number
-    error?: string
-  }>
+interface EmailProcessingResult {
+  type: 'new' | 'reply' | 'skip'
+  success: boolean
+  emailId: string
+  ticketId?: string
+  ticketNumber?: number
+  error?: string
+  reason?: string
 }
 
-export async function checkNewEmails(supabaseKey: string): Promise<EmailCheckResult> {
+interface CheckEmailsResponse {
+  processed: number
+  results: EmailProcessingResult[]
+}
+
+export async function checkNewEmails(supabaseKey: string): Promise<CheckEmailsResponse> {
   const response = await fetch(`${env.supabase.url}/functions/v1/email-to-ticket`, {
     method: 'POST',
     headers: {

@@ -32,6 +32,7 @@ serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  let client: any = null;
   try {
     // Parse request URL
     const url = new URL(req.url);
@@ -46,30 +47,39 @@ serve(async (req: Request) => {
           })
         }
 
-        const client = new ImapFlow({
+        console.log('Creating IMAP client...');
+        client = new ImapFlow({
           host: 'imap.gmail.com',
           port: 993,
           secure: true,
           auth: {
             user: 'autocrm.sys@gmail.com',
             pass: Deno.env.get("GMAIL_APP_PASSWORD") || ""
-          }
+          },
+          logger: true
         });
 
+        console.log('Connecting to IMAP server...');
         // Wait until client connects and authorizes
         await client.connect();
+        console.log('Connected to IMAP server');
 
         // Select and lock a mailbox
+        console.log('Getting mailbox lock...');
         let lock = await client.getMailboxLock('INBOX');
+        console.log('Got mailbox lock');
+        
         const emails: EmailMessage[] = [];
         
         try {
           // First search for unread messages
+          console.log('Searching for unread messages...');
           const list = await client.search({ unseen: true });
           console.log(`Found ${list.length} unread messages`);
           
           // Then fetch each message
           for (const seq of list) {
+            console.log(`Fetching message ${seq}...`);
             const message = await client.fetchOne(seq, {
               source: true,
               envelope: true
@@ -78,6 +88,10 @@ serve(async (req: Request) => {
             // Extract priority from subject or body
             const priorityMatch = message.source?.toString().match(/#(urgent|high|medium|low)/i);
             const priority = priorityMatch ? priorityMatch[1].toLowerCase() as 'urgent' | 'high' | 'medium' | 'low' : undefined;
+
+            // Debug logging for envelope and inReplyTo
+            console.log('Full envelope for message:', JSON.stringify(message.envelope, null, 2));
+            console.log('InReplyTo array:', message.envelope.inReplyTo);
 
             // Parse email content
             const source = message.source?.toString() || '';
@@ -118,9 +132,19 @@ serve(async (req: Request) => {
               .replace(/\r?\n\s*#(urgent|high|medium|low)/i, '\n#$1') // Clean up priority tags
               .trim();
 
+            // Additional cleanup only for replies
+            if (message.envelope.inReplyTo) {
+              console.log('Cleaning up reply body. Before:', body);
+              body = body
+                .replace(/On.*wrote:[\s\S]*$/, '') // Remove "On... wrote:" and everything after
+                .replace(/^>.*$/gm, '') // Remove quoted lines starting with >
+                .trim();
+              console.log('After reply cleanup:', body);
+            }
+
             const email: EmailMessage = {
               messageId: message.envelope.messageId,
-              inReplyTo: message.envelope.inReplyTo?.[0],
+              inReplyTo: message.envelope.inReplyTo,
               from: message.envelope.from?.[0].address,
               to: message.envelope.to?.[0].address,
               subject: message.envelope.subject,
@@ -134,13 +158,21 @@ serve(async (req: Request) => {
             // Mark as seen
             await client.messageFlagsAdd(seq, ['\\Seen']);
           }
+        } catch (err) {
+          console.error('Error processing messages:', err);
+          throw err;
         } finally {
           // Always release the lock
+          console.log('Releasing mailbox lock...');
           lock.release();
         }
 
         // Close the connection
-        await client.logout();
+        if (client) {
+          console.log('Logging out of IMAP server...');
+          await client.logout();
+          console.log('Logged out of IMAP server');
+        }
 
         return new Response(JSON.stringify({ 
           success: true,
@@ -158,6 +190,16 @@ serve(async (req: Request) => {
         })
     }
   } catch (error: unknown) {
+    // Make sure to clean up IMAP client on error
+    if (client) {
+      try {
+        console.log('Cleaning up IMAP client after error...');
+        await client.logout();
+      } catch (cleanupError) {
+        console.error('Error cleaning up IMAP client:', cleanupError);
+      }
+    }
+
     console.error('Detailed error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return new Response(JSON.stringify({ 

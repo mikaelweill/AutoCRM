@@ -3,6 +3,21 @@ import { Button } from './ui/Button'
 import { checkNewEmails } from '../services/email'
 import { createClient } from '../lib/supabase'
 
+interface EmailProcessingResult {
+  type: 'new' | 'reply' | 'skip'
+  success: boolean
+  emailId: string
+  ticketId?: string
+  ticketNumber?: number
+  error?: string
+  reason?: string
+}
+
+interface CheckEmailsResponse {
+  processed: number
+  results: EmailProcessingResult[]
+}
+
 export function CheckEmailsButton() {
   const [isChecking, setIsChecking] = useState(false)
   const [notification, setNotification] = useState<{
@@ -25,10 +40,11 @@ export function CheckEmailsButton() {
           message: 'No new emails found to process.'
         })
       } else {
-        const successCount = result.results.filter(r => r.success).length
+        const newTickets = result.results.filter(r => r.type === 'new' && r.success).length
+        const replies = result.results.filter(r => r.type === 'reply' && r.success).length
         setNotification({
           type: 'success',
-          message: `Processed ${result.processed} emails. Created ${successCount} new tickets.`
+          message: `Found ${result.processed} unread emails (${newTickets} new, ${replies} replies)`
         })
       }
     } catch (error) {

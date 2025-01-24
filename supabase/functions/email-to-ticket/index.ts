@@ -43,6 +43,36 @@ async function findUserByEmail(email: string) {
   return user
 }
 
+async function findTicketByMessageId(messageId: string) {
+  const { data, error } = await supabase
+    .from('ticket_emails')
+    .select('ticket_id')
+    .eq('message_id', messageId)
+    .single()
+
+  if (error) {
+    console.log('No ticket found for message:', messageId)
+    return null
+  }
+
+  return data
+}
+
+async function isEmailProcessed(messageId: string) {
+  const { data, error } = await supabase
+    .from('ticket_emails')
+    .select('id')
+    .eq('message_id', messageId)
+    .single()
+
+  if (error) {
+    console.log('Email not previously processed:', messageId)
+    return false
+  }
+
+  return true
+}
+
 async function createTicketFromEmail(email: EmailMessage) {
   // Find user by email
   const user = await findUserByEmail(email.from)
@@ -88,6 +118,43 @@ async function createTicketFromEmail(email: EmailMessage) {
   return ticket
 }
 
+async function createTicketComment(ticketId: string, email: EmailMessage) {
+  // First find the user
+  const user = await findUserByEmail(email.from)
+  if (!user) {
+    throw new Error(`No user found for email: ${email.from}`)
+  }
+
+  // Store the email metadata
+  const { error: emailError } = await supabase
+    .from('ticket_emails')
+    .insert({
+      ticket_id: ticketId,
+      message_id: email.messageId,
+      in_reply_to: email.inReplyTo,
+      from_email: email.from,
+      to_email: email.to,
+      subject: email.subject,
+      direction: 'inbound',
+      received_at: email.receivedAt
+    })
+
+  if (emailError) throw new Error(`Error saving email metadata: ${emailError.message}`)
+
+  // Create the comment
+  const { error: commentError } = await supabase
+    .from('ticket_activities')
+    .insert({
+      ticket_id: ticketId,
+      activity_type: 'comment',
+      content: email.body,
+      created_at: email.receivedAt,
+      user_id: user.id
+    })
+
+  if (commentError) throw new Error(`Error creating comment: ${commentError.message}`)
+}
+
 serve(async (req: Request) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
@@ -109,14 +176,60 @@ serve(async (req: Request) => {
     }
 
     const { emails = [] } = await imapResponse.json()
-    console.log(`Processing ${emails.length} new emails`)
+    console.log(`Received ${emails.length} unread emails from IMAP`)
 
     const results = []
+    let processedCount = 0
+    let skippedCount = 0
+    let replyCount = 0
+    let newCount = 0
+
     for (const email of emails) {
       try {
+        // Check if we've already processed this email
+        if (await isEmailProcessed(email.messageId)) {
+          console.log(`Skipping already processed email: ${email.messageId}`)
+          skippedCount++
+          results.push({
+            type: 'skip',
+            success: true,
+            emailId: email.messageId,
+            reason: 'already_processed'
+          })
+          continue
+        }
+
+        processedCount++
+        
+        // Check if this is a reply to an existing ticket
+        if (email.inReplyTo) {
+          console.log(`Processing potential reply - Message ID: ${email.messageId}, In-Reply-To: ${email.inReplyTo}`)
+          const originalEmail = await findTicketByMessageId(email.inReplyTo)
+          if (originalEmail) {
+            console.log(`Found original ticket ${originalEmail.ticket_id} for reply`)
+            replyCount++
+            // This is a reply to an existing ticket
+            await createTicketComment(originalEmail.ticket_id, email)
+            results.push({
+              type: 'reply',
+              success: true,
+              emailId: email.messageId,
+              ticketId: originalEmail.ticket_id
+            })
+            continue // Skip creating a new ticket
+          } else {
+            console.log(`Could not find original ticket for In-Reply-To: ${email.inReplyTo}, creating new ticket instead`)
+          }
+        } else {
+          console.log(`Email ${email.messageId} is not a reply (no In-Reply-To header)`)
+        }
+
+        // If not a reply or original ticket not found, create new ticket
         const ticket = await createTicketFromEmail(email)
         if (ticket) {
+          newCount++
           results.push({
+            type: 'new',
             success: true,
             emailId: email.messageId,
             ticketId: ticket.id,
@@ -126,12 +239,22 @@ serve(async (req: Request) => {
       } catch (error) {
         console.error(`Error processing email ${email.messageId}:`, error)
         results.push({
+          type: email.inReplyTo ? 'reply' : 'new',
           success: false,
           emailId: email.messageId,
           error: error instanceof Error ? error.message : String(error)
         })
       }
     }
+
+    console.log(`
+Processing summary:
+- Total unread: ${emails.length}
+- Already processed: ${skippedCount}
+- New tickets: ${newCount}
+- Replies: ${replyCount}
+- Errors: ${emails.length - (skippedCount + newCount + replyCount)}
+`)
 
     return new Response(
       JSON.stringify({
