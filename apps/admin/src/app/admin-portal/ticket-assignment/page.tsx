@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react'
 import { createClient } from 'shared/src/lib/supabase'
 import { TICKET_PRIORITIES, TICKET_STATUSES, getStatusDetails, getPriorityDetails } from 'shared/src/config/tickets'
 import { ChevronUp, ChevronDown } from 'lucide-react'
+import { Modal } from 'shared/src/components/ui/Modal'
+import { TicketTemplate } from 'shared/src/components/tickets/TicketTemplate'
+import { Ticket } from 'shared/src/services/tickets'
 
 interface TicketRow {
   id: string
@@ -45,6 +48,7 @@ export default function TicketAssignmentPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sort, setSort] = useState<SortConfig>({ field: 'created_at', direction: 'desc' })
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -207,6 +211,40 @@ export default function TicketAssignmentPage() {
     </th>
   )
 
+  async function handleTicketClick(ticket: TicketRow) {
+    // Fetch full ticket details including activities and attachments
+    const { data, error } = await supabase
+      .from('tickets')
+      .select(`
+        *,
+        client:client_id(id, email, full_name),
+        agent:agent_id(id, email, full_name),
+        activities:ticket_activities(
+          id,
+          activity_type,
+          content,
+          created_at,
+          user:user_id(id, email, full_name)
+        ),
+        attachments(*)
+      `)
+      .eq('id', ticket.id)
+      .single()
+
+    if (error) {
+      console.error('Error fetching ticket details:', error)
+      return
+    }
+
+    setSelectedTicket(data as unknown as Ticket)
+  }
+
+  // Function to get attachment URL
+  async function getAttachmentUrl(path: string) {
+    const { data } = await supabase.storage.from('attachments').createSignedUrl(path, 3600)
+    return data?.signedUrl || ''
+  }
+
   if (loading) {
     return (
       <div className="p-6">
@@ -246,6 +284,9 @@ export default function TicketAssignmentPage() {
               <SortHeader field="status" label="Status" />
               <SortHeader field="priority" label="Priority" />
               <SortHeader field="created_at" label="Created" />
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                View
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -341,11 +382,34 @@ export default function TicketAssignmentPage() {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {new Date(ticket.created_at).toLocaleString()}
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <button
+                    onClick={() => handleTicketClick(ticket)}
+                    className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    View Details
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Ticket Detail Modal */}
+      <Modal
+        isOpen={!!selectedTicket}
+        onClose={() => setSelectedTicket(null)}
+        title={`Ticket #${selectedTicket?.number}`}
+      >
+        {selectedTicket && (
+          <TicketTemplate
+            ticket={selectedTicket}
+            getAttachmentUrl={getAttachmentUrl}
+            isDetailView
+          />
+        )}
+      </Modal>
     </div>
   )
 } 
