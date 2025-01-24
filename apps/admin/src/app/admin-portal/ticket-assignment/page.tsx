@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from 'shared/src/lib/supabase'
 import { TICKET_PRIORITIES, TICKET_STATUSES, getStatusDetails, getPriorityDetails } from 'shared/src/config/tickets'
+import { ChevronUp, ChevronDown } from 'lucide-react'
 
 interface TicketRow {
   id: string
@@ -30,11 +31,20 @@ interface Agent {
   email: string
 }
 
+type SortField = 'number' | 'client' | 'agent' | 'subject' | 'status' | 'priority' | 'created_at'
+type SortDirection = 'asc' | 'desc'
+
+interface SortConfig {
+  field: SortField
+  direction: SortDirection
+}
+
 export default function TicketAssignmentPage() {
   const [tickets, setTickets] = useState<TicketRow[]>([])
   const [agents, setAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [sort, setSort] = useState<SortConfig>({ field: 'created_at', direction: 'desc' })
   const supabase = createClient()
 
   useEffect(() => {
@@ -144,6 +154,59 @@ export default function TicketAssignmentPage() {
     }
   }
 
+  function handleSort(field: SortField) {
+    setSort(prev => ({
+      field,
+      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
+    }))
+  }
+
+  function getSortedTickets() {
+    return [...tickets].sort((a, b) => {
+      const direction = sort.direction === 'asc' ? 1 : -1
+      
+      switch (sort.field) {
+        case 'number':
+          return (a.number - b.number) * direction
+        case 'client':
+          return (a.client.name.localeCompare(b.client.name)) * direction
+        case 'agent':
+          const aName = a.agent?.name || ''
+          const bName = b.agent?.name || ''
+          return aName.localeCompare(bName) * direction
+        case 'subject':
+          return a.subject.localeCompare(b.subject) * direction
+        case 'status':
+          return a.status.localeCompare(b.status) * direction
+        case 'priority':
+          return a.priority.localeCompare(b.priority) * direction
+        case 'created_at':
+          return (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * direction
+        default:
+          return 0
+      }
+    })
+  }
+
+  const SortHeader = ({ field, label }: { field: SortField; label: string }) => (
+    <th 
+      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+      onClick={() => handleSort(field)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        <div className="flex flex-col">
+          <ChevronUp 
+            className={`h-3 w-3 ${sort.field === field && sort.direction === 'asc' ? 'text-blue-600' : 'text-gray-400'}`}
+          />
+          <ChevronDown 
+            className={`h-3 w-3 ${sort.field === field && sort.direction === 'desc' ? 'text-blue-600' : 'text-gray-400'}`}
+          />
+        </div>
+      </div>
+    </th>
+  )
+
   if (loading) {
     return (
       <div className="p-6">
@@ -176,31 +239,17 @@ export default function TicketAssignmentPage() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                ID
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Client
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Agent
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Title
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Priority
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Created
-              </th>
+              <SortHeader field="number" label="ID" />
+              <SortHeader field="client" label="Client" />
+              <SortHeader field="agent" label="Agent" />
+              <SortHeader field="subject" label="Title" />
+              <SortHeader field="status" label="Status" />
+              <SortHeader field="priority" label="Priority" />
+              <SortHeader field="created_at" label="Created" />
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {tickets.map(ticket => (
+            {getSortedTickets().map(ticket => (
               <tr key={ticket.id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {ticket.number}
