@@ -1,95 +1,78 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from 'shared/src/lib/supabase'
+import { KBArticleViewer } from 'shared/src/components/KBArticleViewer'
 import { Database } from 'shared/src/types/database'
-import { Card, CardContent, CardHeader, CardTitle } from 'shared/src/components/ui/card'
-import { Skeleton } from 'shared/src/components/ui/skeleton'
-import { ChevronLeft } from 'lucide-react'
-import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 
 type KBArticle = Database['public']['Tables']['knowledge_base_articles']['Row']
 
-export default function ArticleDetail() {
+export default function ArticlePage({ params }: { params: { id: string } }) {
+  const [article, setArticle] = useState<KBArticle | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [article, setArticle] = useState<KBArticle | null>(null)
+  const router = useRouter()
   const supabase = createClient()
-  const params = useParams()
-  const id = params.id as string
 
   useEffect(() => {
-    async function loadArticle() {
+    async function fetchArticle() {
       try {
         const { data, error } = await supabase
           .from('knowledge_base_articles')
           .select<'*', KBArticle>('*')
-          .eq('id', id)
+          .eq('id', params.id)
           .eq('is_published', true)
           .single()
 
         if (error) throw error
-        setArticle(data as KBArticle)
+        if (!data) {
+          setError('Article not found')
+          return
+        }
+
+        setArticle(data)
       } catch (err) {
-        console.error('Error loading article:', err)
+        console.error('Error fetching article:', err)
         setError('Failed to load article')
       } finally {
         setLoading(false)
       }
     }
 
-    loadArticle()
-  }, [id])
+    fetchArticle()
+  }, [params.id])
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-96 w-full" />
+      <div className="p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-64 bg-gray-200 rounded"></div>
+        </div>
       </div>
     )
   }
 
   if (error || !article) {
     return (
-      <div className="text-center py-8">
-        <p className="text-red-500">{error || 'Article not found'}</p>
-        <Link 
-          href="/client-portal/knowledge-base"
-          className="inline-flex items-center px-4 py-2 mt-4 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-        >
-          Back to Knowledge Base
-        </Link>
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+          {error || 'Article not found'}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center gap-4">
-        <Link 
-          href="/client-portal/knowledge-base"
-          className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-        >
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Back
-        </Link>
-        <div>
-          <p className="text-sm text-muted-foreground">{article.category}</p>
-          <h1 className="text-2xl font-bold">{article.title}</h1>
-        </div>
-      </div>
-
-      <Card>
-        <CardContent className="prose prose-sm max-w-none py-6">
-          {article.content}
-        </CardContent>
-      </Card>
-
-      <div className="text-sm text-muted-foreground">
-        Last updated: {new Date(article.updated_at).toLocaleDateString()}
-      </div>
+    <div className="p-6">
+      <button
+        onClick={() => router.back()}
+        className="mb-6 text-sm text-gray-500 hover:text-gray-700"
+      >
+        ← Back to Knowledge Base
+      </button>
+      <KBArticleViewer article={article} />
     </div>
   )
 } 

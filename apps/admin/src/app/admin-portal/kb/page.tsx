@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from 'shared/src/lib/supabase'
-import { Plus, Search } from 'lucide-react'
+import { KnowledgeBase } from 'shared/src/components/KnowledgeBase'
 import { Database } from 'shared/src/types/database'
+import { Dialog } from 'shared/src/components/ui/Dialog'
+import { KBArticleViewer } from 'shared/src/components/KBArticleViewer'
+import { KBArticleEditor } from 'shared/src/components/KBArticleEditor'
 
 type KBArticle = Database['public']['Tables']['knowledge_base_articles']['Row']
 
@@ -11,7 +14,8 @@ export default function KBPage() {
   const [articles, setArticles] = useState<KBArticle[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedArticle, setSelectedArticle] = useState<KBArticle | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
   
   const supabase = createClient()
 
@@ -36,100 +40,88 @@ export default function KBPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
-        </div>
-      </div>
-    )
+  const handleNewArticle = () => {
+    // TODO: Implement new article creation
+    console.log('New article clicked')
   }
 
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          {error}
-        </div>
-      </div>
-    )
+  const handleArticleClick = (article: KBArticle) => {
+    setSelectedArticle(article)
+    setIsEditing(false)
   }
 
-  const filteredArticles = articles.filter(article =>
-    article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    article.content.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const handleEditArticle = (article: KBArticle) => {
+    setIsEditing(true)
+  }
+
+  const handleSaveArticle = async (updatedArticle: Partial<KBArticle>) => {
+    if (!selectedArticle) return
+
+    try {
+      const { data, error } = await supabase
+        .from('knowledge_base_articles')
+        .update(updatedArticle)
+        .eq('id', selectedArticle.id)
+        .select<'*', KBArticle>('*')
+        .single()
+
+      if (error) throw error
+
+      // Update the articles list with the updated article
+      setArticles(articles.map(article => 
+        article.id === selectedArticle.id ? data : article
+      ))
+
+      // Update the selected article and exit edit mode
+      setSelectedArticle(data)
+      setIsEditing(false)
+    } catch (err) {
+      console.error('Error updating article:', err)
+      alert('Failed to update article')
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+  }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Knowledge Base</h1>
-        <button
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+    <>
+      <KnowledgeBase
+        articles={articles}
+        isLoading={loading}
+        error={error}
+        showNewButton={true}
+        onNewArticle={handleNewArticle}
+        onArticleClick={handleArticleClick}
+      />
+
+      {selectedArticle && (
+        <Dialog 
+          isOpen={true}
+          onClose={() => {
+            setSelectedArticle(null)
+            setIsEditing(false)
+          }}
+          title={isEditing ? 'Edit Article' : selectedArticle.title}
         >
-          <Plus className="h-5 w-5 mr-2" />
-          New Article
-        </button>
-      </div>
-
-      {/* Search Bar */}
-      <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-gray-400" />
-        </div>
-        <input
-          type="text"
-          placeholder="Search articles..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-        />
-      </div>
-
-      {/* Articles List */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-md">
-        <ul className="divide-y divide-gray-200">
-          {filteredArticles.map((article) => (
-            <li key={article.id}>
-              <div className="px-4 py-4 sm:px-6 hover:bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-medium text-gray-900 truncate">
-                      {article.title}
-                    </h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {article.content.substring(0, 200)}...
-                    </p>
-                  </div>
-                  <div className="ml-4 flex-shrink-0">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      article.is_published 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {article.is_published ? 'Published' : 'Draft'}
-                    </span>
-                  </div>
-                </div>
-                <div className="mt-2 sm:flex sm:justify-between">
-                  <div className="sm:flex">
-                    <p className="flex items-center text-sm text-gray-500">
-                      {article.category}
-                    </p>
-                  </div>
-                  <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                    <p>
-                      Updated {new Date(article.updated_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
+          <div className="max-w-4xl mx-auto">
+            {isEditing ? (
+              <KBArticleEditor
+                article={selectedArticle}
+                onSave={handleSaveArticle}
+                onCancel={handleCancelEdit}
+              />
+            ) : (
+              <KBArticleViewer
+                article={selectedArticle}
+                isEditable={true}
+                onEdit={() => handleEditArticle(selectedArticle)}
+              />
+            )}
+          </div>
+        </Dialog>
+      )}
+    </>
   )
 } 
