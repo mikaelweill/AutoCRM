@@ -53,6 +53,9 @@ export default function AdminPortal() {
   const [activities, setActivities] = useState<ActivityItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalActivities, setTotalActivities] = useState(0)
+  const activitiesPerPage = 10
   
   const supabase = createClient()
 
@@ -116,6 +119,23 @@ export default function AdminPortal() {
       supabase.removeChannel(usersChannel)
     }
   }, []) // Empty dependency array since supabase client is stable
+
+  // Add new effect for pagination
+  useEffect(() => {
+    // Only fetch activities when page changes
+    const fetchActivitiesOnly = async () => {
+      try {
+        const activities = await fetchRecentActivities()
+        setActivities(activities)
+        setError(null)
+      } catch (err) {
+        console.error('Error fetching activities:', err)
+        setError('Failed to load activities')
+      }
+    }
+
+    fetchActivitiesOnly()
+  }, [currentPage]) // Dependency on currentPage
 
   async function fetchDashboardData() {
     try {
@@ -249,6 +269,14 @@ export default function AdminPortal() {
   }
 
   async function fetchRecentActivities(): Promise<ActivityItem[]> {
+    // First get total count
+    const { count } = await supabase
+      .from('ticket_activities')
+      .select('*', { count: 'exact', head: true })
+
+    setTotalActivities(count || 0)
+
+    // Then get paginated data
     const { data: activities, error: activitiesError } = await supabase
       .from('ticket_activities')
       .select(`
@@ -266,7 +294,7 @@ export default function AdminPortal() {
         users!user_id(id, email, full_name, role)
       `)
       .order('created_at', { ascending: false })
-      .limit(10)
+      .range((currentPage - 1) * activitiesPerPage, currentPage * activitiesPerPage - 1)
 
     if (activitiesError) throw activitiesError
 
@@ -463,6 +491,31 @@ export default function AdminPortal() {
               ))}
             </tbody>
           </table>
+          
+          {/* Pagination Controls */}
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 flex justify-between items-center">
+                <button
+                  onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-700">
+                  Page {currentPage} of {Math.ceil(totalActivities / activitiesPerPage)}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(page => Math.min(Math.ceil(totalActivities / activitiesPerPage), page + 1))}
+                  disabled={currentPage >= Math.ceil(totalActivities / activitiesPerPage)}
+                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
     </div>
