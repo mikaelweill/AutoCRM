@@ -7,6 +7,7 @@ import { ChevronUp, ChevronDown } from 'lucide-react'
 import { Modal } from 'shared/src/components/ui/Modal'
 import { TicketTemplate } from 'shared/src/components/tickets/TicketTemplate'
 import { Ticket } from 'shared/src/services/tickets'
+import { CheckEmailsButton } from 'shared/src/components/CheckEmailsButton'
 
 interface TicketRow {
   id: string
@@ -250,11 +251,7 @@ export default function TicketAssignmentPage() {
       <div className="p-6">
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="space-y-2">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-12 bg-gray-200 rounded"></div>
-            ))}
-          </div>
+          <div className="bg-gray-200 rounded-lg h-96"></div>
         </div>
       </div>
     )
@@ -272,128 +269,134 @@ export default function TicketAssignmentPage() {
 
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-bold mb-4">Ticket Assignment</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold">Ticket Assignment</h1>
+        <CheckEmailsButton />
+      </div>
+      
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <SortHeader field="number" label="ID" />
-              <SortHeader field="client" label="Client" />
-              <SortHeader field="agent" label="Agent" />
-              <SortHeader field="subject" label="Title" />
-              <SortHeader field="status" label="Status" />
-              <SortHeader field="priority" label="Priority" />
-              <SortHeader field="created_at" label="Created" />
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                View
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {getSortedTickets().map(ticket => (
-              <tr key={ticket.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {ticket.number}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm">
-                    <div className="font-medium text-gray-900">{ticket.client.name}</div>
-                    <div className="text-gray-500">{ticket.client.email}</div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <select
-                    className="text-sm border-gray-300 rounded-md"
-                    value={ticket.agent?.id || ''}
-                    onChange={(e) => {
-                      const agentId = e.target.value || null
-                      updateTicket(ticket.id, { 
-                        agent_id: agentId,
-                        // If assigning agent, set status to in_progress
-                        status: agentId ? 'in_progress' : 'new'
-                      })
-                    }}
-                  >
-                    <option value="">Unassigned</option>
-                    {agents.map(agent => (
-                      <option key={agent.id} value={agent.id}>
-                        {agent.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm text-gray-900 max-w-md break-words">
-                    {ticket.subject}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <select
-                    className={`text-sm rounded-md px-3 py-1 font-medium ${
-                      getStatusDetails(ticket.status as any)?.color || 'bg-gray-100 text-gray-800'
-                    }`}
-                    value={ticket.status}
-                    onChange={(e) => {
-                      const newStatus = e.target.value
-                      // If status is being set to in_progress but no agent, show error
-                      if (newStatus === 'in_progress' && !ticket.agent) {
-                        alert('Please assign an agent first')
-                        return
-                      }
-                      // If status is being set to new, remove agent
-                      const updates: any = { status: newStatus }
-                      if (newStatus === 'new') {
-                        updates.agent_id = null
-                      }
-                      updateTicket(ticket.id, updates)
-                    }}
-                  >
-                    {TICKET_STATUSES.map(status => (
-                      <option 
-                        key={status.value} 
-                        value={status.value}
-                        disabled={status.value === 'in_progress' && !ticket.agent}
-                        className={status.color}
-                      >
-                        {status.label}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <select
-                    className={`text-sm rounded-md px-3 py-1 font-medium ${
-                      getPriorityDetails(ticket.priority as any)?.color || 'bg-gray-100 text-gray-800'
-                    }`}
-                    value={ticket.priority}
-                    onChange={(e) => updateTicket(ticket.id, { priority: e.target.value })}
-                  >
-                    {TICKET_PRIORITIES.map(priority => (
-                      <option 
-                        key={priority.value} 
-                        value={priority.value}
-                        className={priority.color}
-                      >
-                        {priority.label}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(ticket.created_at).toLocaleString()}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <button
-                    onClick={() => handleTicketClick(ticket)}
-                    className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    View Details
-                  </button>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <SortHeader field="number" label="ID" />
+                <SortHeader field="client" label="Client" />
+                <SortHeader field="agent" label="Agent" />
+                <SortHeader field="subject" label="Title" />
+                <SortHeader field="status" label="Status" />
+                <SortHeader field="priority" label="Priority" />
+                <SortHeader field="created_at" label="Created" />
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  View
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {getSortedTickets().map(ticket => (
+                <tr key={ticket.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {ticket.number}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm">
+                      <div className="font-medium text-gray-900">{ticket.client.name}</div>
+                      <div className="text-gray-500">{ticket.client.email}</div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <select
+                      className="text-sm border-gray-300 rounded-md"
+                      value={ticket.agent?.id || ''}
+                      onChange={(e) => {
+                        const agentId = e.target.value || null
+                        updateTicket(ticket.id, { 
+                          agent_id: agentId,
+                          // If assigning agent, set status to in_progress
+                          status: agentId ? 'in_progress' : 'new'
+                        })
+                      }}
+                    >
+                      <option value="">Unassigned</option>
+                      {agents.map(agent => (
+                        <option key={agent.id} value={agent.id}>
+                          {agent.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm text-gray-900 max-w-md break-words">
+                      {ticket.subject}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <select
+                      className={`text-sm rounded-md px-3 py-1 font-medium ${
+                        getStatusDetails(ticket.status as any)?.color || 'bg-gray-100 text-gray-800'
+                      }`}
+                      value={ticket.status}
+                      onChange={(e) => {
+                        const newStatus = e.target.value
+                        // If status is being set to in_progress but no agent, show error
+                        if (newStatus === 'in_progress' && !ticket.agent) {
+                          alert('Please assign an agent first')
+                          return
+                        }
+                        // If status is being set to new, remove agent
+                        const updates: any = { status: newStatus }
+                        if (newStatus === 'new') {
+                          updates.agent_id = null
+                        }
+                        updateTicket(ticket.id, updates)
+                      }}
+                    >
+                      {TICKET_STATUSES.map(status => (
+                        <option 
+                          key={status.value} 
+                          value={status.value}
+                          disabled={status.value === 'in_progress' && !ticket.agent}
+                          className={status.color}
+                        >
+                          {status.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <select
+                      className={`text-sm rounded-md px-3 py-1 font-medium ${
+                        getPriorityDetails(ticket.priority as any)?.color || 'bg-gray-100 text-gray-800'
+                      }`}
+                      value={ticket.priority}
+                      onChange={(e) => updateTicket(ticket.id, { priority: e.target.value })}
+                    >
+                      {TICKET_PRIORITIES.map(priority => (
+                        <option 
+                          key={priority.value} 
+                          value={priority.value}
+                          className={priority.color}
+                        >
+                          {priority.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(ticket.created_at).toLocaleString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <button
+                      onClick={() => handleTicketClick(ticket)}
+                      className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      View Details
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Ticket Detail Modal */}

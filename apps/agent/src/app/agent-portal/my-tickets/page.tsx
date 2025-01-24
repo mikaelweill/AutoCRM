@@ -116,7 +116,9 @@ export default function MyTicketsPage() {
             priorities: TICKET_PRIORITIES.map(p => p.value)
           }}
           availableStatuses={myTicketStatuses}
-          renderHeader={<h1 className="text-2xl font-semibold">My Tickets</h1>}
+          renderHeader={
+            <h1 className="text-2xl font-semibold">My Tickets</h1>
+          }
           renderActions={ticket => (
             <div className="flex gap-2">
               {ticket.status !== 'closed' && (

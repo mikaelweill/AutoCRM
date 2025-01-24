@@ -79,47 +79,46 @@ export default function AgentDashboard() {
 
   if (loading) {
     return (
-      <div className="p-8">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-8">Agent Dashboard</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-gray-100 rounded-lg h-32 animate-pulse" />
-          ))}
+      <div className="p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
+            ))}
+          </div>
         </div>
       </div>
     )
   }
 
-  if (error) {
-    return (
-      <div className="p-8">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-8">Agent Dashboard</h1>
-        <div className="text-red-500">Error loading stats: {error}</div>
-      </div>
-    )
-  }
-
-  const statCards = [
-    { title: 'Total Open Tickets', value: stats?.totalOpenTickets ?? 0, icon: '🎫' },
-    { title: 'Unassigned Tickets', value: stats?.unassignedTickets ?? 0, icon: '📥' },
-    { title: 'High Priority Tickets', value: stats?.highPriorityTickets ?? 0, icon: '🔥' },
-    { title: 'My Active Tickets', value: stats?.myActiveTickets ?? 0, icon: '👤' },
-  ]
-
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-semibold text-gray-900 mb-8">Agent Dashboard</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map((stat, index) => (
-          <StatCard
-            key={index}
-            title={stat.title}
-            value={stat.value}
-            icon={stat.icon}
-          />
-        ))}
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold">Agent Dashboard</h1>
       </div>
+
+      {error ? (
+        <div className="bg-red-50 text-red-600 p-4 rounded-lg">{error}</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <StatCard
+            title="Total Open Tickets"
+            value={stats?.totalOpenTickets ?? 0}
+            icon="🎫"
+          />
+          <StatCard
+            title="High Priority"
+            value={stats?.highPriorityTickets ?? 0}
+            icon="🔥"
+          />
+          <StatCard
+            title="My Active Tickets"
+            value={stats?.myActiveTickets ?? 0}
+            icon="👤"
+          />
+        </div>
+      )}
     </div>
   )
 } 

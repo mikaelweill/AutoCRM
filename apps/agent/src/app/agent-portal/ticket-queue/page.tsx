@@ -6,6 +6,7 @@ import { ActionButton } from 'shared/src/components/tickets/TicketTemplate'
 import { TicketList } from 'shared/src/components/tickets/TicketList'
 import { TICKET_PRIORITIES, TICKET_STATUSES } from 'shared/src/config/tickets'
 import { createClient } from 'shared/src/lib/supabase'
+import { CheckEmailsButton } from 'shared/src/components/CheckEmailsButton'
 
 export default function TicketQueuePage() {
   const [tickets, setTickets] = useState<Ticket[]>([])
@@ -102,7 +103,14 @@ export default function TicketQueuePage() {
             priorities: TICKET_PRIORITIES.map(p => p.value)
           }}
           availableStatuses={queueStatuses}
-          renderHeader={<h1 className="text-2xl font-semibold">Ticket Queue</h1>}
+          renderHeader={
+            <div className="flex items-center justify-between w-full">
+              <h1 className="text-2xl font-semibold">Ticket Queue</h1>
+              <div className="ml-auto">
+                <CheckEmailsButton />
+              </div>
+            </div>
+          }
           renderActions={ticket => (
             <ActionButton.claim
               onClick={(e) => {
