@@ -10,7 +10,6 @@ const adminNavLinks = [
   { href: '/admin-portal', label: 'Dashboard' },
   { href: '/admin-portal/ticket-assignment', label: 'Ticket Assignment' },
   { href: '/admin-portal/users', label: 'User Management' },
-  { href: '/admin-portal/settings', label: 'Settings' },
   { href: '/admin-portal/analytics', label: 'Analytics' }
 ]
 
