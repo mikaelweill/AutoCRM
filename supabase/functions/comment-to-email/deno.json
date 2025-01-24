@@ -1,0 +1,9 @@
+{
+  "imports": {
+    "@std/http/server": "jsr:@std/http/server",
+    "@supabase/supabase-js": "jsr:@supabase/supabase-js"
+  },
+  "tasks": {
+    "serve": "deno run --allow-net --allow-env index.ts"
+  }
+} 

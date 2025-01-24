@@ -395,6 +395,7 @@ export async function addTicketReply(ticketId: string, content: string): Promise
     throw new Error('User must be logged in to add reply')
   }
 
+  // Create the comment
   const { data, error } = await supabase
     .from('ticket_activities')
     .insert({
@@ -414,6 +415,57 @@ export async function addTicketReply(ticketId: string, content: string): Promise
 
   if (!isTicketActivity(data)) {
     throw new Error('Invalid activity data received')
+  }
+
+  // Check if user is admin/agent
+  const { data: userData, error: userRoleError } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  console.log('User role check:', { userData, userRoleError })
+
+  if (!userRoleError && (userData?.role === 'admin' || userData?.role === 'agent')) {
+    // Check if ticket was created from email
+    const { data: emailData } = await supabase
+      .from('ticket_emails')
+      .select('id')
+      .eq('ticket_id', ticketId)
+      .limit(1)
+      .single()
+
+    console.log('Email data check:', { emailData })
+
+    if (emailData) {
+      // This ticket has email history, send the comment as an email
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('No session found')
+
+        const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/comment-to-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            ticketId,
+            commentId: data.id,
+            content,
+            userId: user.id
+          })
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error('Comment-to-email error:', errorText)
+        }
+      } catch (error) {
+        console.error('Failed to send comment as email:', error)
+        // Don't throw error since comment was created successfully
+      }
+    }
   }
 
   return data
