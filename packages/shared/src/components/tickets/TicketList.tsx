@@ -7,6 +7,7 @@ import { TicketStatus, TicketPriority, TICKET_PRIORITIES, TICKET_STATUSES } from
 import { TicketTemplate } from './TicketTemplate'
 import { TicketFilters } from './TicketFilters'
 import { Dialog } from '../ui/Dialog'
+import { TicketModalContext } from '../../contexts/TicketModalContext'
 
 interface TicketListProps {
   tickets: Ticket[]
@@ -136,23 +137,25 @@ export function TicketList({
       )}
 
       {/* Detail View Modal */}
-      <Dialog
-        isOpen={selectedTicket !== null}
-        onClose={() => setSelectedTicket(null)}
-        title={selectedTicket ? `Ticket ${selectedTicket.number}` : ''}
-      >
-        {selectedTicket && (
-          <TicketTemplate
-            ticket={selectedTicket}
-            getAttachmentUrl={getAttachmentUrl}
-            renderActions={renderActions}
-            hideComments={hideComments}
-            hideAttachments={hideAttachments}
-            readOnlyComments={readOnlyComments}
-            isDetailView={true}
-          />
-        )}
-      </Dialog>
+      <TicketModalContext.Provider value={{ closeModal: () => setSelectedTicket(null) }}>
+        <Dialog
+          isOpen={selectedTicket !== null}
+          onClose={() => setSelectedTicket(null)}
+          title={selectedTicket ? `Ticket ${selectedTicket.number}` : ''}
+        >
+          {selectedTicket && (
+            <TicketTemplate
+              ticket={selectedTicket}
+              getAttachmentUrl={getAttachmentUrl}
+              renderActions={renderActions}
+              hideComments={hideComments}
+              hideAttachments={hideAttachments}
+              readOnlyComments={readOnlyComments}
+              isDetailView={true}
+            />
+          )}
+        </Dialog>
+      </TicketModalContext.Provider>
 
       {/* Create Ticket Modal */}
       {renderCreateForm && (

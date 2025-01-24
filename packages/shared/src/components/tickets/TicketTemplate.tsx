@@ -8,6 +8,7 @@ import { Button } from '../ui/Button'
 import { useState, useEffect } from 'react'
 import { createClient } from '../../lib/supabase'
 import { addTicketReply } from '../../services/tickets'
+import { useTicketModal } from '../../contexts/TicketModalContext'
 
 interface TicketTemplateProps {
   ticket: Ticket
@@ -202,55 +203,85 @@ const CommentSection = ({ ticket, readOnly }: { ticket: Ticket; readOnly?: boole
 
 // Action button variants with consistent styling
 export const ActionButton = {
-  claim: ({ onClick, loading, children }: { onClick: (e: React.MouseEvent) => void, loading?: boolean, children: React.ReactNode }) => (
-    <Button
-      onClick={onClick}
-      disabled={loading}
-      variant="success"
-    >
-      {loading ? 'Loading...' : children}
-    </Button>
-  ),
+  claim: ({ onClick, loading, children }: { onClick: (e: React.MouseEvent) => void, loading?: boolean, children: React.ReactNode }) => {
+    const { closeModal } = useTicketModal()
+    return (
+      <Button
+        onClick={async (e) => {
+          await onClick(e)
+          closeModal()
+        }}
+        disabled={loading}
+        variant="success"
+      >
+        {loading ? 'Loading...' : children}
+      </Button>
+    )
+  },
   
-  unclaim: ({ onClick, loading, children }: { onClick: (e: React.MouseEvent) => void, loading?: boolean, children: React.ReactNode }) => (
-    <Button
-      onClick={onClick}
-      disabled={loading}
-      variant="destructive"
-    >
-      {loading ? 'Loading...' : children}
-    </Button>
-  ),
+  unclaim: ({ onClick, loading, children }: { onClick: (e: React.MouseEvent) => void, loading?: boolean, children: React.ReactNode }) => {
+    const { closeModal } = useTicketModal()
+    return (
+      <Button
+        onClick={async (e) => {
+          await onClick(e)
+          closeModal()
+        }}
+        disabled={loading}
+        variant="destructive"
+      >
+        {loading ? 'Loading...' : children}
+      </Button>
+    )
+  },
   
-  close: ({ onClick, loading, children }: { onClick: (e: React.MouseEvent) => void, loading?: boolean, children: React.ReactNode }) => (
-    <Button
-      onClick={onClick}
-      disabled={loading}
-      variant="success"
-    >
-      {loading ? 'Loading...' : children}
-    </Button>
-  ),
+  close: ({ onClick, loading, children }: { onClick: (e: React.MouseEvent) => void, loading?: boolean, children: React.ReactNode }) => {
+    const { closeModal } = useTicketModal()
+    return (
+      <Button
+        onClick={async (e) => {
+          await onClick(e)
+          closeModal()
+        }}
+        disabled={loading}
+        variant="success"
+      >
+        {loading ? 'Loading...' : children}
+      </Button>
+    )
+  },
   
-  cancel: ({ onClick, loading, children }: { onClick: (e: React.MouseEvent) => void, loading?: boolean, children: React.ReactNode }) => (
-    <Button
-      onClick={onClick}
-      disabled={loading}
-      variant="destructive"
-    >
-      {loading ? 'Loading...' : children}
-    </Button>
-  ),
+  cancel: ({ onClick, loading, children }: { onClick: (e: React.MouseEvent) => void, loading?: boolean, children: React.ReactNode }) => {
+    const { closeModal } = useTicketModal()
+    return (
+      <Button
+        onClick={async (e) => {
+          await onClick(e)
+          closeModal()
+        }}
+        disabled={loading}
+        variant="destructive"
+      >
+        {loading ? 'Loading...' : children}
+      </Button>
+    )
+  },
 
-  reopen: ({ onClick, loading, children }: { onClick: (e: React.MouseEvent) => void, loading?: boolean, children: React.ReactNode }) => (
-    <Button
-      onClick={onClick}
-      disabled={loading}
-      variant="success"
-    >
-      {loading ? 'Loading...' : children}
-    </Button>
-  )
+  reopen: ({ onClick, loading, children }: { onClick: (e: React.MouseEvent) => void, loading?: boolean, children: React.ReactNode }) => {
+    const { closeModal } = useTicketModal()
+    return (
+      <Button
+        onClick={async (e) => {
+          await onClick(e)
+          closeModal()
+        }}
+        disabled={loading}
+        variant="success"
+      >
+        {loading ? 'Loading...' : children}
+      </Button>
+    )
+  }
 }
 
 export function TicketTemplate({
