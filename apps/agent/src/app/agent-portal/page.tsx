@@ -29,8 +29,14 @@ export default function AgentDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth()
 
   useEffect(() => {
+    if (!user) {
+      console.log('No authenticated user yet, waiting...')
+      return
+    }
+
     const supabase = createClient()
     
     async function fetchStats() {
@@ -44,16 +50,15 @@ export default function AgentDashboard() {
       }
     }
 
-    // Initial fetch
     fetchStats()
 
-    // Set up real-time subscription
+    console.log('Setting up subscription for user:', user.id)
     const channel = supabase
       .channel('public:tickets')
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to all events
+          event: '*',
           schema: 'public',
           table: 'tickets'
         },
@@ -63,11 +68,14 @@ export default function AgentDashboard() {
         }
       )
 
-    console.log('Setting up subscription...')
     channel.subscribe((status) => {
       console.log('Subscription status:', status)
       if (status === 'SUBSCRIBED') {
         console.log('Successfully subscribed to tickets changes')
+      } else if (status === 'CHANNEL_ERROR') {
+        console.error('Channel error, will retry for user:', user.id)
+        channel.unsubscribe()
+        channel.subscribe()
       }
     })
 
@@ -75,7 +83,7 @@ export default function AgentDashboard() {
       console.log('Cleaning up subscription')
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [user])
 
   if (loading) {
     return (
