@@ -241,4 +241,85 @@ WebSocket URL: '.../websocket?apikey=...role=anon...'
 1. Are WebSocket connections being initiated?
 2. Are connections being rejected?
 3. Are there any error messages in the console?
-4. What's different about agent authentication? 
+4. What's different about agent authentication?
+
+## Subscription Pattern Comparison
+
+### Agent Portal (`apps/agent/src/app/agent-portal/page.tsx`)
+```typescript
+const channel = supabase
+  .channel('public:tickets')
+  .on(
+    'postgres_changes',
+    {
+      event: '*',
+      schema: 'public',
+      table: 'tickets'
+    },
+    () => fetchStats()
+  )
+  .subscribe((status) => {
+    console.log('Subscription status:', status)
+    if (status === 'SUBSCRIBED') {
+      console.log('Successfully subscribed to tickets changes')
+    } else if (status === 'CHANNEL_ERROR') {
+      console.error('Channel error for user:', user.id)
+    }
+  })
+```
+
+### Admin Portal (`apps/admin/src/app/admin-portal/page.tsx`)
+```typescript
+const ticketsChannel = supabase
+  .channel('tickets-changes')
+  .on(
+    'postgres_changes',
+    {
+      event: '*',
+      schema: 'public',
+      table: 'tickets'
+    },
+    () => fetchDashboardData()
+  )
+  .subscribe()
+```
+
+### Client Portal (`apps/client/src/app/client-portal/page.tsx`)
+```typescript
+const channel = supabase
+  .channel('public:tickets')
+  .on(
+    'postgres_changes',
+    {
+      event: '*',
+      schema: 'public',
+      table: 'tickets'
+    },
+    () => fetchStats()
+  )
+  .subscribe((status) => {
+    console.log('Subscription status:', status)
+    if (status === 'SUBSCRIBED') {
+      console.log('Successfully subscribed to tickets changes')
+    }
+  })
+```
+
+### Key Differences
+1. **Channel Names**:
+   - Agent & Client: Use `'public:tickets'` (schema-based naming)
+   - Admin: Uses `'tickets-changes'` (custom naming)
+
+2. **Subscription Handling**:
+   - Agent: Has explicit error handling for `CHANNEL_ERROR`
+   - Client: Only logs successful subscription
+   - Admin: No status handling
+
+3. **Auth Dependencies**:
+   - Agent: Waits for `user` from `useAuth()`
+   - Client & Admin: Start subscription immediately
+
+4. **Error Handling**:
+   - Agent: Most robust with error states
+   - Client: Basic success logging
+   - Admin: No explicit error handling 
