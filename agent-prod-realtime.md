@@ -59,26 +59,32 @@ JWT Claims: {
 WebSocket URL: '.../websocket?apikey=...role=anon...'
 ```
 
+### Attempt 3: Simplified Subscription (Latest)
+- Removed user dependency and auth check
+- Moved Supabase client creation to component level
+- Simplified subscription by removing status handling
+- Removed extra logging
+- Changed to match client/admin pattern exactly
+- **Result**: Still failing in production with same symptoms
+  - WebSocket still connects with anon role
+  - Suggests issue is not related to subscription setup or timing
+  - Points to a more fundamental difference in how the agent portal handles WebSocket connections in production
+
 ### Current Issues Identified
-1. **Authentication Timing**:
-   - Auth state shows INITIAL_SESSION correctly
-   - User object is present with correct ID
-   - But WebSocket still connects with anon role
+1. **Authentication Timing**: ❌ (Ruled out)
+   - Removing auth dependency didn't help
+   - Simple subscription still fails
+   - Same behavior as complex subscription
 
-2. **Connection Issues**:
-   ```
-   Setting up subscription for user: [correct-uuid]
-   WebSocket connection failed
-   Subscription status: CHANNEL_ERROR
-   Channel error, will retry for user: [correct-uuid]
-   Subscription status: CLOSED
-   Error: tried to subscribe multiple times
-   ```
+2. **Connection Issues**: 🔍 (Primary Focus)
+   - WebSocket consistently uses anon role in production
+   - Behavior persists across different subscription patterns
+   - Issue appears environment-specific (prod vs local)
 
-3. **Retry Loop Problems**:
-   - Retry logic causes multiple subscription attempts
-   - Results in "tried to subscribe multiple times" error
-   - Subsequent WebSocket connections continue to fail
+3. **Retry Loop Problems**: ✅ (Resolved)
+   - Removed retry logic
+   - Simplified subscription setup
+   - No more multiple subscription attempts
 
 ## Key Differences from Working Portals
 
@@ -183,25 +189,67 @@ WebSocket URL: '.../websocket?apikey=...role=anon...'
 
 ## Most Likely Hypotheses (Ranked)
 
-1. **JWT Token Role Issue**
+1. **Channel Configuration Issue**
+   - Why: Different channel naming and setup patterns between portals
+   - Evidence: Admin uses 'tickets-changes', while agent/client use 'public:tickets'
+   - Test: Align channel naming and configuration across portals
+
+2. **WebSocket Connection Timing**
+   - Why: Agent portal has more complex subscription setup with status handling
+   - Evidence: Admin portal subscribes immediately without status checks
+   - Test: Simplify subscription timing and error handling
+
+3. **JWT Token Role Issue**
    - Why: The `custom_access_token_hook` modifies JWT claims
    - Evidence: Role is set to 'authenticated' for Postgres but user_role in metadata
    - Test: Check if realtime policies correctly interpret the role from JWT
 
-2. **WebSocket Connection**
-   - Why: WebSocket might be using different auth context
-   - Evidence: Only agent portal in prod is affected
-   - Test: Monitor WebSocket connection attempts and JWT token used
+4. **Environment-Specific Behavior**
+   - Why: Works in local but fails in production despite same code
+   - Evidence: Only agent portal affected in production
+   - Test: Compare environment variables and configuration between environments
 
-3. **RLS Policy Interpretation**
-   - Why: Policies might interpret agent role differently
-   - Evidence: Works locally but not in prod
-   - Test: Compare JWT tokens between local and prod
+## Potential Solutions (Ranked)
 
-4. **Supabase Client Configuration**
-   - Why: Client setup might differ in prod
-   - Evidence: Other portals work fine
-   - Test: Compare client initialization between portals
+1. **Standardize Channel Configuration**
+   - Align channel naming with working admin portal
+   - Remove status handling
+   - Use consistent subscription patterns
+
+2. **Simplify Subscription Setup**
+   - Remove explicit error handling
+   - Subscribe immediately like admin portal
+   - Minimize subscription configuration
+
+3. **Environment Configuration**
+   - Verify environment variables
+   - Check Supabase project settings
+   - Ensure consistent configuration
+
+4. **Hybrid Approach**
+   - Test different channel configurations
+   - Implement fallback mechanisms
+   - Monitor subscription success rates
+
+## Implementation Plan
+
+### Option 1: Channel Standardization
+1. Update channel name to match admin portal
+2. Remove status handling
+3. Simplify subscription code
+4. Test in development and production
+
+### Option 2: Subscription Simplification
+1. Remove error handling
+2. Remove status checks
+3. Subscribe immediately
+4. Test behavior
+
+### Option 3: Environment Alignment
+1. Audit environment variables
+2. Check Supabase settings
+3. Verify configuration
+4. Test in both environments
 
 ## Action Plan
 

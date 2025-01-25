@@ -60,7 +60,12 @@ export default function AgentDashboard() {
           fetchStats()
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log('Subscription status:', status)
+        if (status === 'SUBSCRIBED') {
+          console.log('Successfully subscribed to tickets changes')
+        }
+      })
 
     return () => {
       supabase.removeChannel(channel)
