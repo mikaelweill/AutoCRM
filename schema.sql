@@ -464,6 +464,10 @@ CREATE INDEX "users_id_idx" ON "public"."users" USING "btree" ("id");
 
 
 
+CREATE OR REPLACE TRIGGER "before_insert_invitations" BEFORE INSERT ON "public"."invitations" FOR EACH ROW EXECUTE FUNCTION "public"."invitations_before_insert"();
+
+
+
 ALTER TABLE ONLY "public"."attachments"
     ADD CONSTRAINT "attachments_ticket_id_fkey" FOREIGN KEY ("ticket_id") REFERENCES "public"."tickets"("id") ON DELETE CASCADE;
 
@@ -538,6 +542,12 @@ CREATE POLICY "Admins can create invitations" ON "public"."invitations" FOR INSE
 
 
 
+CREATE POLICY "Admins can delete invitations" ON "public"."invitations" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."users"
+  WHERE (("users"."id" = "auth"."uid"()) AND ("users"."role" = 'admin'::"public"."user_role")))));
+
+
+
 CREATE POLICY "Admins can view invitations" ON "public"."invitations" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM "public"."users"
   WHERE (("users"."id" = "auth"."uid"()) AND ("users"."role" = 'admin'::"public"."user_role")))));
@@ -597,12 +607,6 @@ CREATE POLICY "Clients can update own tickets" ON "public"."tickets" FOR UPDATE 
 
 
 CREATE POLICY "Clients can view own tickets" ON "public"."tickets" FOR SELECT TO "authenticated" USING ((("client_id" = "auth"."uid"()) OR ("agent_id" = "auth"."uid"()) OR (EXISTS ( SELECT 1
-   FROM "public"."users"
-  WHERE (("users"."id" = "auth"."uid"()) AND ("users"."role" = ANY (ARRAY['agent'::"public"."user_role", 'admin'::"public"."user_role"])))))));
-
-
-
-CREATE POLICY "Clients can view their own tickets" ON "public"."tickets" FOR SELECT TO "authenticated" USING ((("client_id" = "auth"."uid"()) OR ("agent_id" = "auth"."uid"()) OR (EXISTS ( SELECT 1
    FROM "public"."users"
   WHERE (("users"."id" = "auth"."uid"()) AND ("users"."role" = ANY (ARRAY['agent'::"public"."user_role", 'admin'::"public"."user_role"])))))));
 
@@ -691,6 +695,10 @@ ALTER PUBLICATION "supabase_realtime_messages_publication" OWNER TO "supabase_ad
 
 
 ALTER PUBLICATION "supabase_realtime" ADD TABLE ONLY "public"."attachments";
+
+
+
+ALTER PUBLICATION "supabase_realtime" ADD TABLE ONLY "public"."invitations";
 
 
 
