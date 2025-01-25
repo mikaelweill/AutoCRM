@@ -132,6 +132,36 @@ export default function UsersPage() {
     navigator.clipboard.writeText(token)
   }
 
+  // Add delete invitation function
+  const handleDeleteInvitation = async (id: string, isUsed: boolean) => {
+    if (isUsed) {
+      setError('Cannot delete used invitations')
+      return
+    }
+
+    try {
+      console.log('Attempting to delete invitation:', id)
+      const { error: deleteError } = await supabase
+        .from('invitations')
+        .delete()
+        .match({ id })
+
+      if (deleteError) {
+        console.error('Delete error:', deleteError)
+        throw new Error(deleteError.message)
+      }
+      
+      console.log('Invitation deleted successfully')
+      // Show success message
+      setError('Invitation deleted successfully')
+      setTimeout(() => setError(null), 3000) // Clear message after 3 seconds
+      
+    } catch (err) {
+      console.error('Error deleting invitation:', err)
+      setError(err instanceof Error ? err.message : 'Failed to delete invitation')
+    }
+  }
+
   // Handle token visibility
   const handleTokenVisibility = (id: string, isCurrentlyRevealed: boolean) => {
     const newRevealedTokens = new Set(revealedTokens)
@@ -297,6 +327,9 @@ export default function UsersPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Expires
               </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -356,6 +389,19 @@ export default function UsersPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(invitation.expires_at).toLocaleString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <button
+                      onClick={() => handleDeleteInvitation(invitation.id, isUsed)}
+                      disabled={isUsed}
+                      className={`inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded ${
+                        isUsed
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'text-red-600 hover:text-red-700 focus:outline-none'
+                      }`}
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               )
