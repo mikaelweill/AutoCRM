@@ -73,9 +73,7 @@ export default function AgentDashboard() {
       if (status === 'SUBSCRIBED') {
         console.log('Successfully subscribed to tickets changes')
       } else if (status === 'CHANNEL_ERROR') {
-        console.error('Channel error, will retry for user:', user.id)
-        channel.unsubscribe()
-        channel.subscribe()
+        console.error('Channel error for user:', user.id)
       }
     })
 

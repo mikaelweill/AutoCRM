@@ -1,10 +1,130 @@
 # Agent Production Realtime Investigation
 
+## Executive Summary
+
+### Problem
+Agent portal's real-time functionality works in localhost but fails in production, while admin and client portals work in both environments.
+
+### Key Findings
+1. **Authentication Works**: JWT claims and user session are correct
+2. **WebSocket Issue**: Connection attempts use anon role despite authenticated session
+3. **Retry Problems**: Our retry logic caused multiple subscription attempts, making the issue worse
+
+### Current Status
+- ✅ Auth State: Working (correct JWT claims, session)
+- ✅ User Context: Present (correct user ID)
+- ❌ WebSocket: Failing (connects with anon role)
+- ❌ Real-time: Not working in production
+
+### Next Action Items
+1. Remove problematic retry logic ✅
+2. Investigate WebSocket auth token usage 🚧
+3. Compare with working portal implementations 🚧
+
+---
+
+## Detailed Investigation
+
 ## Current State
 - ✅ Localhost: All portals (client, agent, admin) have realtime
 - ✅ Production: Client portal has realtime
 - ✅ Production: Admin portal has realtime
 - ❌ Production: Agent portal lacks realtime
+
+## Investigation Timeline
+
+### Initial Setup
+1. Compared subscription setup across portals:
+   - Admin: Simple setup, no explicit error handling
+   - Client: Basic setup with status logging
+   - Agent: Enhanced setup with auth check and error handling
+
+### Attempt 1: Enhanced Error Handling
+- Added waiting for authenticated user
+- Added explicit error handling for CHANNEL_ERROR
+- Added retry logic for failed connections
+- **Result**: Still failing in production
+
+### Attempt 2: Auth State Analysis
+Observed behavior in production:
+```javascript
+// Initial state correct
+JWT Claims: {
+  aud: 'authenticated',
+  exp: 1737775145,
+  // ... correct claims
+}
+
+// But WebSocket connects with anon role
+WebSocket URL: '.../websocket?apikey=...role=anon...'
+```
+
+### Current Issues Identified
+1. **Authentication Timing**:
+   - Auth state shows INITIAL_SESSION correctly
+   - User object is present with correct ID
+   - But WebSocket still connects with anon role
+
+2. **Connection Issues**:
+   ```
+   Setting up subscription for user: [correct-uuid]
+   WebSocket connection failed
+   Subscription status: CHANNEL_ERROR
+   Channel error, will retry for user: [correct-uuid]
+   Subscription status: CLOSED
+   Error: tried to subscribe multiple times
+   ```
+
+3. **Retry Loop Problems**:
+   - Retry logic causes multiple subscription attempts
+   - Results in "tried to subscribe multiple times" error
+   - Subsequent WebSocket connections continue to fail
+
+## Key Differences from Working Portals
+
+### 1. Admin Portal
+- Doesn't wait for auth state
+- Uses simpler subscription setup
+- Works in production despite less robust implementation
+
+### 2. Client Portal
+- Similar to admin setup
+- No explicit error handling
+- Works in production with basic implementation
+
+### 3. Agent Portal (Current)
+- Waits for auth state ✅
+- Has error handling ✅
+- Includes retry logic ❌ (causing issues)
+- Uses authenticated user check ✅
+- Still connects with anon role ❌
+
+## Root Cause Analysis
+1. **Primary Issue**:
+   - WebSocket connection uses anon apikey despite authenticated session
+   - Retry logic compounds the problem by creating multiple failed attempts
+
+2. **Contributing Factors**:
+   - Auth state might not be fully propagated when WebSocket connects
+   - Retry mechanism may be interfering with natural reconnection
+   - Multiple subscription attempts causing channel conflicts
+
+## Next Steps
+
+### Immediate Actions
+1. Remove retry logic to prevent multiple subscription attempts
+2. Investigate why WebSocket uses anon apikey despite authenticated session
+3. Compare Supabase client initialization between portals
+
+### Questions to Answer
+1. Why does the WebSocket use anon apikey when JWT claims are correct?
+2. Why do admin and client portals work with simpler implementation?
+3. Is there a timing issue between auth state and WebSocket connection?
+
+### Potential Solutions to Try
+1. Delay WebSocket connection until after auth confirmation
+2. Simplify to match working portal implementations
+3. Investigate Supabase client configuration differences
 
 ## Key Findings
 
