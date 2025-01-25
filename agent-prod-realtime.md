@@ -1,3 +1,46 @@
+# Latest Analysis (2024-01-22)
+
+You make a really important point. Let's think about what makes AGENT/PROD uniquely different from the other 5 combinations:
+
+Looking at the code, there are a few places where AGENT is treated differently:
+
+1. **Role Validation in signup-with-token**:
+   - Strict portal-specific role checking
+   - Must match invitation role with portal type
+   - Enforced in production URLs
+
+2. **Auth Callback**:
+   ```typescript
+   // Check if user has the required role
+   const userRole = session?.user?.app_metadata?.user_role
+   if (!userRole || userRole !== 'agent') {
+     return NextResponse.redirect(new URL('/unauthorized', requestUrl.origin))
+   }
+   ```
+
+3. **CORS Headers**:
+   - Strict origin validation
+   - Different handling for different subdomains
+
+The fact that it's ONLY agent in production suggests:
+- It's not a timing issue (would affect dev too)
+- It's not a role permission issue (would affect dev too)
+- It's not a general CORS issue (would affect other prod sites)
+
+It must be something that is:
+- Specific to the agent subdomain
+- Only happens in production
+- Related to WebSocket connection (since regular API calls work)
+
+Could it be:
+- A specific Supabase configuration for the agent subdomain?
+- A WebSocket-specific CORS rule that's different for the agent subdomain?
+- A DNS/routing issue specific to the agent subdomain's WebSocket traffic?
+
+The key insight is that it must be something that ONLY affects WebSocket connections from the agent subdomain in production. That's a very specific condition that should help narrow down where to look.
+
+---
+
 # Agent Production Realtime Investigation
 
 ## Executive Summary

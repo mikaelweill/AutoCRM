@@ -47,7 +47,7 @@ export default function AgentDashboard() {
 
     // Set up real-time subscription
     const channel = supabase
-      .channel('public:tickets')
+      .channel('tickets-changes')
       .on(
         'postgres_changes',
         {
