@@ -414,3 +414,41 @@ const channel = supabase
    - Agent: Most robust with error states
    - Client: Basic success logging
    - Admin: No explicit error handling 
+
+# Agent Portal Real-time Investigation
+
+## Latest Update (2024-01-22)
+
+### Recent Investigation Findings
+1. **WebSocket Connection Analysis**:
+   - WebSocket consistently connects with anon role despite authenticated session
+   - Connection URL shows `role=anon` in the apikey parameter
+   - Multiple connection attempts result in repeated `CHANNEL_ERROR` status
+   - Auth state shows correct JWT claims and successful sign-in
+
+2. **Attempted Solutions**:
+   - Matched admin portal's subscription pattern exactly:
+     - Used `tickets-changes` channel name
+     - Removed status handling
+     - Simplified subscription code
+   - Result: Still fails with same symptoms
+     - WebSocket still connects with anon role
+     - Suggests issue is not related to subscription setup
+
+3. **Key Insights**:
+   - Problem occurs before channel subscription
+   - WebSocket connection uses anon key before auth upgrade attempt
+   - Issue specific to agent subdomain in production
+   - Other portals (client/admin) work with same Supabase client setup
+
+4. **Current Understanding**:
+   - Issue likely related to Site URL configuration in Supabase
+   - Site URL only allows one domain
+   - Works for client/admin but fails for agent subdomain
+   - WebSocket connections may have stricter domain requirements
+
+### Next Steps to Investigate
+1. **Potential Solutions**:
+   - Set up proxy for WebSocket connections
+   - Use different Supabase projects per environment
+   - Move WebSocket connections to shared domain 

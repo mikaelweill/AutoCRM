@@ -45,6 +45,8 @@ export default function AgentDashboard() {
 
     fetchStats()
 
+    console.log('Setting up realtime subscription...')
+    
     // Set up real-time subscription
     const channel = supabase
       .channel('tickets-changes')
@@ -55,19 +57,29 @@ export default function AgentDashboard() {
           schema: 'public',
           table: 'tickets'
         },
-        () => {
-          console.log('Ticket change detected, refreshing stats...')
+        (payload) => {
+          console.log('Ticket change detected:', payload)
           fetchStats()
         }
       )
-      .subscribe((status) => {
-        console.log('Subscription status:', status)
+      .subscribe((status, err) => {
+        console.log('Subscription attempt with status:', status)
         if (status === 'SUBSCRIBED') {
           console.log('Successfully subscribed to tickets changes')
+        }
+        if (status === 'CHANNEL_ERROR') {
+          console.error('Channel error:', err)
+        }
+        if (status === 'TIMED_OUT') {
+          console.error('Subscription timed out')
+        }
+        if (status === 'CLOSED') {
+          console.error('Channel closed')
         }
       })
 
     return () => {
+      console.log('Cleaning up subscription...')
       supabase.removeChannel(channel)
     }
   }, []) // Empty dependency array since supabase client is stable
