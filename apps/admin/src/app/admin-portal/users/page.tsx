@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from 'shared/src/lib/supabase'
-import { Shield, UserCog, Eye, EyeOff, Copy } from 'lucide-react'
+import { Shield, UserCog, Eye, EyeOff, Copy, Trash2 } from 'lucide-react'
 
 interface Invitation {
   id: string
@@ -328,7 +328,7 @@ export default function UsersPage() {
                 Expires
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
+                Delete
               </th>
             </tr>
           </thead>
@@ -396,11 +396,11 @@ export default function UsersPage() {
                       disabled={isUsed}
                       className={`inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded ${
                         isUsed
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          ? 'text-gray-400 cursor-not-allowed'
                           : 'text-red-600 hover:text-red-700 focus:outline-none'
                       }`}
                     >
-                      Delete
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </td>
                 </tr>
