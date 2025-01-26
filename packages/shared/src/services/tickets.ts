@@ -83,6 +83,10 @@ export interface ClientDashboardStats {
   }
 }
 
+interface TicketInsertResponse {
+  id: string;
+}
+
 // Type guards
 function isUser(data: unknown): data is User {
   const user = data as User
@@ -181,7 +185,7 @@ export async function createTicket(data: CreateTicketData): Promise<string> {
   console.log('Auth user:', user)
 
   try {
-    // Insert ticket
+    // Create ticket first
     const { data: ticket, error: ticketError } = await supabase
       .from('tickets')
       .insert({
@@ -192,22 +196,42 @@ export async function createTicket(data: CreateTicketData): Promise<string> {
         status: 'new'
       })
       .select('id')
-      .single()
+      .single();
 
-    if (ticketError) {
-      console.error('Ticket creation error:', ticketError)
-      throw ticketError
-    }
-    if (!ticket || typeof ticket.id !== 'string') {
-      throw new Error('Failed to create ticket')
+    if (ticketError) throw ticketError;
+    // Type guard for ticket.id
+    if (!ticket?.id || typeof ticket.id !== 'string') {
+      throw new Error('Failed to create ticket');
     }
 
-    const ticketId = ticket.id
+    // Generate embedding via API
+    const ticketText = `
+      Title: ${data.subject}
+      Description: ${data.description}
+      Priority: ${data.priority}
+    `.trim();
+
+    const embedResponse = await fetch('/api/embeddings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: ticketText })
+    });
+
+    if (embedResponse.ok) {
+      const { embedding } = await embedResponse.json();
+      
+      // Store embedding
+      await supabase.from('ticket_embeddings').upsert({
+        id: ticket.id,
+        embedding,
+        ticket_text: ticketText
+      });
+    }
 
     // Handle attachments if any
     if (data.attachments?.length) {
       for (const file of data.attachments) {
-        const path = `tickets/${ticketId}/${file.name}`
+        const path = `tickets/${ticket.id}/${file.name}`
         
         // Upload file
         const { error: uploadError } = await supabase.storage
@@ -223,7 +247,7 @@ export async function createTicket(data: CreateTicketData): Promise<string> {
         const { error: attachmentError } = await supabase
           .from('attachments')
           .insert({
-            ticket_id: ticketId,
+            ticket_id: ticket.id,
             user_id: user.id,
             file_name: file.name,
             file_type: file.type,
@@ -237,10 +261,10 @@ export async function createTicket(data: CreateTicketData): Promise<string> {
       }
     }
 
-    return ticketId
+    return ticket.id;
   } catch (error) {
-    console.error('Error creating ticket:', error)
-    throw new Error('Failed to create ticket')
+    console.error('Error creating ticket:', error);
+    throw new Error('Failed to create ticket');
   }
 }
 

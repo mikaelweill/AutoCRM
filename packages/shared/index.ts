@@ -18,4 +18,7 @@ export * from './src/services/tickets'
 // Utils
 export * from './src/utils/cn'
 
+// AI functionality
+export * from './src/lib/ai'
+
 // We'll add more exports as we move more shared code 

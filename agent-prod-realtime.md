@@ -1,5 +1,54 @@
 # Latest Analysis (2024-01-22)
 
+### RLS and WebSocket Connection Analysis
+
+After investigating the Row Level Security (RLS) policies and their interaction with WebSocket connections, we can conclusively determine that RLS is not contributing to the connection issues. Here's the detailed analysis:
+
+#### WebSocket Connection Sequence
+1. Initial connection with anon key
+2. WebSocket handshake (101 Switching Protocols)
+3. Authentication upgrade with JWT
+4. Channel subscription
+5. RLS policies applied to data access
+
+#### Current Issue
+- The connection fails at step 2 (WebSocket handshake)
+- We see:
+  ```
+  Status: Finished
+  Size: 0 B
+  ```
+- Instead of the expected:
+  ```
+  Status: 101 Switching Protocols
+  State: Pending
+  ```
+
+#### Evidence
+
+1. Development Environment:
+   - Connection succeeds (Status 101)
+   - Authentication works
+   - RLS policies work (data is received)
+   - Same code, same RLS policies
+
+2. Production Environment:
+   - Connection fails immediately
+   - Never reaches authentication step
+   - Never reaches RLS evaluation
+   - Same code, same RLS policies
+
+#### Conclusion
+- The issue occurs BEFORE authentication happens
+- The issue occurs BEFORE RLS policies are evaluated
+- RLS policies would only matter if we could establish the WebSocket connection
+- This strongly suggests a network/infrastructure issue (Vercel, DNS, etc.) rather than a database permission issue
+
+#### Next Steps
+1. Investigate Vercel's WebSocket handling for the agent subdomain
+2. Review DNS and routing configuration
+3. Compare infrastructure setup between working portals and agent portal
+
 You make a really important point. Let's think about what makes AGENT/PROD uniquely different from the other 5 combinations:
 
 Looking at the code, there are a few places where AGENT is treated differently:
