@@ -1,5 +1,5 @@
 import { OpenAI } from 'openai';
-import { createClient } from '../supabase';
+import { createServerClient } from '../supabase-server';
 import { Ticket } from '../../types/tickets';
 import { TicketPriority } from '../../config/tickets';
 import { Database } from '../database.types';
@@ -41,14 +41,19 @@ interface TicketEmbeddingData {
   priority: TicketPriority;
 }
 
-type CommentFields = Pick<TicketActivity, 'content' | 'created_at'>;
+type CommentFields = Pick<TicketActivity, 
+  'content' | 
+  'created_at' | 
+  'activity_type' | 
+  'is_internal'
+>;
 
-interface TicketWithComments extends Pick<TicketRow, 'id' | 'subject' | 'description' | 'priority'> {
-  comments: CommentFields[];
+interface TicketWithActivities extends Pick<TicketRow, 'id' | 'subject' | 'description' | 'priority'> {
+  activities: CommentFields[];
 }
 
 export async function storeAndFindSimilarTickets(ticket: TicketEmbeddingData) {
-  const supabase = createClient();
+  const supabase = createServerClient();
   
   try {
     // Generate embedding once
@@ -84,9 +89,12 @@ export async function storeAndFindSimilarTickets(ticket: TicketEmbeddingData) {
 }
 
 export async function updateTicketEmbeddingWithComments(ticketId: string) {
-  const supabase = createClient();
+  const supabase = createServerClient();
   
   try {
+    console.log('Starting embedding update for ticket:', ticketId);
+
+    console.log(ticketId)
     // Get ticket and its public comments
     const { data, error: ticketError } = await supabase
       .from('tickets')
@@ -95,31 +103,43 @@ export async function updateTicketEmbeddingWithComments(ticketId: string) {
         subject,
         description,
         priority,
-        comments:ticket_activities!inner(
+        activities:ticket_activities(
+          id,
           content,
-          created_at
+          created_at,
+          activity_type,
+          is_internal,
+          user:users(id, email, full_name)
         )
       `)
       .eq('id', ticketId)
-      .eq('ticket_activities.activity_type', 'comment')
-      .eq('ticket_activities.is_internal', false)
-      .single();
+      .single()
 
-    if (ticketError) throw ticketError;
-    if (!data) throw new Error('Ticket not found');
+    console.log('Query result:', { data, error: ticketError });
+
+    if (ticketError) {
+      console.log('Error fetching ticket:', ticketError);
+      throw ticketError;
+    }
+    if (!data) {
+      console.log('No ticket found with ID:', ticketId);
+      throw new Error('Ticket not found');
+    }
 
     // Type guard to verify the shape of our data
-    const isTicketWithComments = (data: unknown): data is TicketWithComments => {
+    const isTicketWithComments = (data: unknown): data is TicketWithActivities => {
       const d = data as any;
       return (
         typeof d.id === 'string' &&
         typeof d.subject === 'string' &&
         typeof d.description === 'string' &&
         typeof d.priority === 'string' &&
-        Array.isArray(d.comments) &&
-        d.comments.every((c: any) => 
+        Array.isArray(d.activities) &&
+        d.activities.every((c: any) => 
           typeof c.content === 'string' &&
-          typeof c.created_at === 'string'
+          typeof c.created_at === 'string' &&
+          typeof c.activity_type === 'string' &&
+          typeof c.is_internal === 'boolean'
         )
       );
     };
@@ -130,23 +150,31 @@ export async function updateTicketEmbeddingWithComments(ticketId: string) {
 
     const ticket = data;
 
-    // Format text with comments in chronological order
+    console.log('Filtering comments...');
+    const filteredComments = ticket.activities.filter(c => 
+      c.activity_type === 'comment' && 
+      !c.is_internal
+    );
+    console.log('Filtered comments count:', filteredComments.length);
+
+    console.log('Generating text...');
     const ticketText = `
       Title: ${ticket.subject}
       Description: ${ticket.description}
       Priority: ${ticket.priority || ''}
       Comments:
-      ${ticket.comments
+      ${filteredComments
         .sort((a: CommentFields, b: CommentFields) => 
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
         .map((comment: CommentFields) => `- ${comment.content}`)
         .join('\n')}
     `.trim();
 
-    // Generate new embedding
+    console.log('Generating embedding...');
     const embedding = await generateEmbedding(ticketText);
+    console.log('Embedding generated');
 
-    // Update embedding
+    console.log('Upserting embedding...');
     const { error: updateError } = await supabase
       .from('ticket_embeddings')
       .upsert({
@@ -155,7 +183,13 @@ export async function updateTicketEmbeddingWithComments(ticketId: string) {
         ticket_text: ticketText,
       });
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.log('Upsert error:', updateError);
+      throw updateError;
+    }
+
+    console.log('Embedding update complete!');
+    return true;
 
   } catch (error) {
     console.error('Error updating ticket embedding with comments:', error);

@@ -441,6 +441,22 @@ export async function addTicketReply(ticketId: string, content: string): Promise
     throw new Error('Invalid activity data received')
   }
 
+  // Add embedding update
+  try {
+    await fetch('/api/embeddings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        text: content,
+        type: 'comment',
+        ticketId 
+      })
+    });
+  } catch (error) {
+    console.error('Failed to update embeddings:', error);
+    // Don't throw - we don't want to fail comment creation if embedding fails
+  }
+
   // Check if user is admin/agent
   const { data: userData, error: userRoleError } = await supabase
     .from('users')

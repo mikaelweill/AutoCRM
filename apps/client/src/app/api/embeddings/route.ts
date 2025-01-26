@@ -1,9 +1,9 @@
-import { generateEmbedding } from 'shared/src/lib/ai/embeddings';
+import { generateEmbedding, updateTicketEmbeddingWithComments } from 'shared/src/lib/ai/embeddings';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    const { text } = await req.json();
+    const { text, type, ticketId } = await req.json();
     
     if (!text) {
       return NextResponse.json(
@@ -12,8 +12,19 @@ export async function POST(req: Request) {
       );
     }
 
+    if (type === 'comment') {
+      if (!ticketId) {
+        return NextResponse.json(
+          { error: 'Ticket ID is required for comments' },
+          { status: 400 }
+        );
+      }
+      await updateTicketEmbeddingWithComments(ticketId);
+      return NextResponse.json({ success: true });
+    }
+
+    // Handle regular ticket embedding
     const embedding = await generateEmbedding(text);
-    
     return NextResponse.json({ embedding });
   } catch (error) {
     console.error('Error generating embedding:', error);

@@ -74,18 +74,38 @@ GET | 401 | https://nkicqyftdkfphifgvejh.supabase.co/functions/v1/gmail-auth/cal
   2. Permission approval
   3. Back to account selection
 
-**Possible Causes:**
-1. PKCE token mismatch between requests
-2. OAuth state not being maintained across redirects
-3. Callback URL handling not completing the OAuth flow properly
-4. Session state being lost between redirects
+**Root Cause & Solution:**
+The issue appears to be CORS-related. Need to:
+
+1. Create `_shared/cors.ts` in Supabase functions:
+```typescript
+export const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+```
+
+2. Update response headers in function:
+```typescript
+return new Response(data, {
+  headers: { 
+    ...corsHeaders, 
+    'Content-Type': 'application/json'
+  },
+  status: 200,
+});
+```
+
+This should:
+- Allow proper cross-origin redirects
+- Maintain OAuth state across redirects
+- Complete the callback flow properly
 
 ## Updated Key Learnings
-1. Previous learnings still apply
-2. OAuth flow starts correctly but doesn't complete
-3. State management might be an issue
-4. PKCE implementation might need review
-5. Callback handling might not be properly closing the OAuth flow
+1. CORS headers are crucial for OAuth flows in Edge Functions
+2. Need proper header handling in both initial request and callback
+3. Shared CORS config helps maintain consistency
+4. OAuth flow starts correctly but doesn't complete
 
 ## Next Immediate Steps
 1. Add debug logging for PKCE code verifier and challenge
