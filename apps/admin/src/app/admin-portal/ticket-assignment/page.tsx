@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react'
 import { createClient } from 'shared/src/lib/supabase'
 import { TICKET_PRIORITIES, TICKET_STATUSES, getStatusDetails, getPriorityDetails } from 'shared/src/config/tickets'
-import { ChevronUp, ChevronDown } from 'lucide-react'
+import { ChevronUp, ChevronDown, Trash2, Eye } from 'lucide-react'
 import { Modal } from 'shared/src/components/ui/Modal'
 import { TicketTemplate } from 'shared/src/components/tickets/TicketTemplate'
-import { Ticket } from 'shared/src/services/tickets'
+import { Ticket, deleteTicket } from 'shared/src/services/tickets'
 import { CheckEmailsButton } from 'shared/src/components/CheckEmailsButton'
 
 interface TicketRow {
@@ -50,6 +50,8 @@ export default function TicketAssignmentPage() {
   const [error, setError] = useState<string | null>(null)
   const [sort, setSort] = useState<SortConfig>({ field: 'created_at', direction: 'desc' })
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
+  const [isDeleting, setIsDeleting] = useState<string | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -246,6 +248,26 @@ export default function TicketAssignmentPage() {
     return data?.signedUrl || ''
   }
 
+  const handleDeleteClick = (ticketId: string) => {
+    setShowDeleteConfirm(ticketId)
+  }
+
+  const handleConfirmDelete = async (ticketId: string) => {
+    try {
+      setIsDeleting(ticketId)
+      await deleteTicket(ticketId)
+      setShowDeleteConfirm(null)
+      // The subscription will handle the refresh
+      setError('Ticket deleted successfully')
+      setTimeout(() => setError(null), 3000)
+    } catch (err) {
+      console.error('Error deleting ticket:', err)
+      setError(err instanceof Error ? err.message : 'Failed to delete ticket')
+    } finally {
+      setIsDeleting(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="p-6">
@@ -288,6 +310,9 @@ export default function TicketAssignmentPage() {
                 <SortHeader field="created_at" label="Created" />
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   View
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Delete
                 </th>
               </tr>
             </thead>
@@ -387,9 +412,22 @@ export default function TicketAssignmentPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <button
                       onClick={() => handleTicketClick(ticket)}
-                      className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-blue-600 hover:text-blue-700 focus:outline-none"
                     >
-                      View Details
+                      <Eye className="h-4 w-4" />
+                    </button>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <button
+                      onClick={() => handleDeleteClick(ticket.id)}
+                      disabled={isDeleting === ticket.id}
+                      className={`inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded ${
+                        isDeleting === ticket.id
+                          ? 'text-gray-400 cursor-not-allowed'
+                          : 'text-red-600 hover:text-red-700 focus:outline-none'
+                      }`}
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </td>
                 </tr>
@@ -399,7 +437,37 @@ export default function TicketAssignmentPage() {
         </div>
       </div>
 
-      {/* Ticket Detail Modal */}
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <Modal
+          isOpen={!!showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(null)}
+          title="Confirm Delete"
+        >
+          <div className="p-6">
+            <p className="text-sm text-gray-600 mb-4">
+              Are you sure you want to delete this ticket? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowDeleteConfirm(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleConfirmDelete(showDeleteConfirm)}
+                disabled={isDeleting === showDeleteConfirm}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-gray-400"
+              >
+                {isDeleting === showDeleteConfirm ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Existing Ticket Detail Modal */}
       <Modal
         isOpen={!!selectedTicket}
         onClose={() => setSelectedTicket(null)}

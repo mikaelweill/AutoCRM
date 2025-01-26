@@ -1148,4 +1148,40 @@ export async function reopenTicket(ticketId: string): Promise<Ticket> {
   }
 
   return updatedTicket
+}
+
+export async function deleteTicket(ticketId: string): Promise<void> {
+  console.log('Attempting to delete ticket:', ticketId)
+  const supabase = createClient()
+  
+  // Get current user
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) {
+    console.error('Error getting user:', userError)
+    throw new Error('User must be logged in to delete ticket')
+  }
+
+  // Delete ticket embedding first (if exists)
+  const { error: embeddingError } = await supabase
+    .from('ticket_embeddings')
+    .delete()
+    .eq('id', ticketId)
+
+  if (embeddingError) {
+    console.error('Error deleting ticket embedding:', embeddingError)
+    // Continue with deletion even if embedding deletion fails
+  }
+
+  // Delete the ticket (this will cascade to attachments, activities, and emails)
+  const { error: deleteError } = await supabase
+    .from('tickets')
+    .delete()
+    .eq('id', ticketId)
+
+  if (deleteError) {
+    console.error('Error deleting ticket:', deleteError)
+    throw new Error('Failed to delete ticket')
+  }
+
+  console.log('Successfully deleted ticket:', ticketId)
 } 

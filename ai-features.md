@@ -33,13 +33,12 @@ interface TicketEmbedding {
 
 #### 2. Immediate Next Steps
 1. **Web Ticket Creation**
-   - Integrate embeddings with createTicket function
+   - Integrate embeddings with `createTicket` function
    - Test similarity search
    - Add error handling
 
 2. **Comment Updates**
-   - Implement comment-based embedding updates
-   - Test with real conversations
+   - Test and validate comment-based embedding updates with real conversations
    - Monitor performance
 
 3. **Email Integration** (Future)
