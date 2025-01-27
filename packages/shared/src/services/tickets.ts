@@ -4,6 +4,12 @@ import { Database } from '../types/database'
 
 // Type aliases for better readability
 type Tables = Database['public']['Tables']
+export type BaseUser = Tables['users']['Row']
+export type BaseTicket = Tables['tickets']['Row']
+export type BaseTicketActivity = Tables['ticket_activities']['Row']
+export type BaseAttachment = Tables['attachments']['Row']
+
+// Type aliases for better readability
 type TicketRow = Tables['tickets']['Row']
 type TicketActivityRow = Tables['ticket_activities']['Row']
 type UserRow = Tables['users']['Row']
