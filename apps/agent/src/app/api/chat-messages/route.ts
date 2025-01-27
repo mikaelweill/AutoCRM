@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { hasRequiredRole } from 'shared/src/auth/utils'
 import { AuthUser } from 'shared/src/auth/types'
 import { Database } from 'shared/src/types/database'
+import { processMessage } from 'shared/src/lib/ai/agent'
 
 type ChatMessageSender = 'agent' | 'assistant'
 
@@ -37,8 +38,8 @@ export async function POST(req: Request) {
       )
     }
 
-    // Insert message into database
-    const { data: message, error: insertError } = await supabase
+    // Insert user message into database
+    const { data: userMessage, error: insertError } = await supabase
       .from('chat_messages')
       .insert({
         agent_id: session.user.id,
@@ -56,7 +57,35 @@ export async function POST(req: Request) {
       )
     }
 
-    return NextResponse.json(message)
+    // Process message through AI
+    const aiResponse = await processMessage(content)
+
+    // Save AI response
+    const { data: assistantMessage, error: aiInsertError } = await supabase
+      .from('chat_messages')
+      .insert({
+        agent_id: session.user.id,
+        content: aiResponse.content,
+        sender: 'assistant' as ChatMessageSender,
+        langsmith_trace_id: aiResponse.trace_id,
+        success: null  // Initially null, will be set by human agent later
+      })
+      .select()
+      .single()
+
+    if (aiInsertError) {
+      console.error('Error saving AI response:', aiInsertError)
+      return NextResponse.json(
+        { error: 'Failed to save AI response' },
+        { status: 500 }
+      )
+    }
+
+    // Return both messages
+    return NextResponse.json({
+      userMessage,
+      assistantMessage
+    })
 
   } catch (error) {
     console.error('Error in chat messages API:', error)

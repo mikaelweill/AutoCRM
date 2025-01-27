@@ -11,20 +11,24 @@ interface Message {
   content: string
   sender: "agent" | "assistant"
   created_at: string
+  isTyping?: boolean  // Add this for typing indicator
 }
 
 interface ChatWindowProps {
   className?: string
 }
 
+// Add this new component before the ChatWindow component
+const TypingIndicator = () => (
+  <div className="flex space-x-2 p-3 bg-muted rounded-2xl rounded-tl-sm max-w-[85%] h-8">
+    <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:-0.3s]" />
+    <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:-0.15s]" />
+    <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" />
+  </div>
+)
+
 export function ChatWindow({ className }: ChatWindowProps) {
   const { user, loading } = useAuth()
-  
-  // Don't render anything if not authenticated or not an agent
-  if (loading || !user || !hasRequiredRole(user, 'agent')) {
-    return null
-  }
-
   const [isOpen, setIsOpen] = React.useState(false)  // Start closed
   const [messages, setMessages] = React.useState<Message[]>([])
   const [input, setInput] = React.useState("")
@@ -33,6 +37,8 @@ export function ChatWindow({ className }: ChatWindowProps) {
 
   // Fetch messages on mount
   React.useEffect(() => {
+    if (!user || !hasRequiredRole(user, 'agent')) return
+
     const fetchMessages = async () => {
       try {
         const response = await fetch('/api/chat-messages')
@@ -46,7 +52,13 @@ export function ChatWindow({ className }: ChatWindowProps) {
       }
     }
     fetchMessages()
-  }, [])
+  }, [user])
+
+  React.useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [messages])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -54,6 +66,25 @@ export function ChatWindow({ className }: ChatWindowProps) {
 
     setIsSending(true)
     try {
+      // Add a temporary typing message
+      const tempTypingMessage: Message = {
+        id: 'typing',
+        content: '',
+        sender: 'assistant',
+        created_at: new Date().toISOString(),
+        isTyping: true
+      }
+      
+      // First add the user's message to the UI immediately
+      const userMessage: Message = {
+        id: 'pending',
+        content: input.trim(),
+        sender: 'agent',
+        created_at: new Date().toISOString()
+      }
+      setMessages(prev => [...prev, userMessage, tempTypingMessage])
+      setInput("") // Clear input immediately after sending
+
       const response = await fetch('/api/chat-messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -64,21 +95,22 @@ export function ChatWindow({ className }: ChatWindowProps) {
         throw new Error('Failed to send message')
       }
 
-      const message = await response.json()
-      setMessages(prev => [...prev, message])
-      setInput("")
+      const { userMessage: savedUserMessage, assistantMessage } = await response.json()
+      
+      // Replace the pending messages with the saved ones
+      setMessages(prev => 
+        prev
+          .filter(m => m.id !== 'pending' && m.id !== 'typing')
+          .concat([savedUserMessage, assistantMessage])
+      )
     } catch (error) {
       console.error('Error sending message:', error)
+      // Remove typing indicator and pending message on error
+      setMessages(prev => prev.filter(m => m.id !== 'typing' && m.id !== 'pending'))
     } finally {
       setIsSending(false)
     }
   }
-
-  React.useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [messages])
 
   // Separate components for better organization
   const Header = () => (
@@ -97,6 +129,11 @@ export function ChatWindow({ className }: ChatWindowProps) {
       </Button>
     </div>
   )
+
+  // Don't render anything if not authenticated or not an agent
+  if (loading || !user || !hasRequiredRole(user, 'agent')) {
+    return null
+  }
 
   return (
     <div 
@@ -123,16 +160,20 @@ export function ChatWindow({ className }: ChatWindowProps) {
                   <span className="text-sm font-medium text-muted-foreground px-2">
                     {message.sender === "agent" ? "You" : "AI Assistant"}
                   </span>
-                  <div
-                    className={cn(
-                      "max-w-[85%] rounded-2xl px-4 py-2.5 text-base leading-relaxed shadow-sm",
-                      message.sender === "agent"
-                        ? "bg-primary text-primary-foreground rounded-tr-sm"
-                        : "bg-muted rounded-tl-sm"
-                    )}
-                  >
-                    {message.content}
-                  </div>
+                  {message.isTyping ? (
+                    <TypingIndicator />
+                  ) : (
+                    <div
+                      className={cn(
+                        "max-w-[85%] rounded-2xl px-4 py-2.5 text-base leading-relaxed shadow-sm",
+                        message.sender === "agent"
+                          ? "bg-primary text-primary-foreground rounded-tr-sm"
+                          : "bg-muted rounded-tl-sm"
+                      )}
+                    >
+                      {message.content}
+                    </div>
+                  )}
                   <span className="text-xs text-muted-foreground/75 px-2">
                     {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
