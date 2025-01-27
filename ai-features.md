@@ -9,6 +9,7 @@ We are implementing ticket embeddings with two parallel flows:
 // Web Flow (Implemented)
 Client Creates Ticket → Store Embedding → Find Similar Tickets
                     └→ Normal Ticket Flow
+                    └→ Delete Flow (Implemented): Delete Ticket → Delete Embedding
 
 // Email Flow (Planned)
 Email → Edge Function → Store Embedding → Find Similar Tickets
@@ -22,6 +23,22 @@ interface TicketEmbedding {
   id: string;
   embedding: number[];
   ticket_text: string;
+  ticket_id: string; // Foreign key with cascade delete
+}
+
+// Planned KB Components
+interface KBArticleEmbedding {
+  id: string;
+  embedding: number[];
+  article_text: string;
+  article_id: string; // Foreign key with cascade delete
+}
+
+interface KBSummaryEmbedding {
+  id: string;
+  embedding: number[];
+  summary_text: string;
+  summary_id: string; // Foreign key with cascade delete
 }
 
 // Functions implemented:
@@ -29,19 +46,36 @@ interface TicketEmbedding {
 - generateTicketEmbedding(ticket: Ticket)
 - storeAndFindSimilarTickets(ticket: Ticket)
 - updateTicketEmbeddingWithComments(ticketId: string)
+- deleteTicketEmbedding(ticketId: string)
 ```
 
-#### 2. Immediate Next Steps
-1. **Web Ticket Creation**
-   - Integrate embeddings with `createTicket` function
-   - Test similarity search
-   - Add error handling
+#### 2. Implementation Progress
+1. **Web Ticket Creation & Management**
+   - ✅ Integrated embeddings with `createTicket` function
+   - ✅ Implemented ticket and embedding synchronization
+   - ✅ Added cascading deletion for tickets and their embeddings
+   - ✅ Added admin-only delete functionality with RLS policies
 
 2. **Comment Updates**
-   - Test and validate comment-based embedding updates with real conversations
-   - Monitor performance
+   - ✅ Implemented comment-based embedding updates
+   - ✅ Synchronized ticket text with latest comments
+   - Test and validate with real conversations (In Progress)
+   - Monitor performance (In Progress)
 
-3. **Email Integration** (Future)
+3. **Knowledge Base Integration** (Next Phase)
+   - Design: Separate embedding tables with foreign key constraints
+   - Rationale:
+     - Strong referential integrity
+     - Automatic cascading deletes
+     - Type safety at database level
+     - Clean separation of concerns
+   - Implementation Steps:
+     - Create KB article embeddings table
+     - Create KB summary embeddings table
+     - Implement similarity search across all embedding types
+     - Add monitoring and performance metrics
+
+4. **Email Integration** (Future)
    - Implement in Edge Function
    - Maintain consistency with web flow
    - Add monitoring
@@ -51,6 +85,7 @@ interface TicketEmbedding {
 - Similarity search accuracy > 80%
 - Successful embedding updates on comments
 - System stability and error handling
+- Cross-content type similarity search performance
 
 ## Implementation Plan (Phase 1)
 
