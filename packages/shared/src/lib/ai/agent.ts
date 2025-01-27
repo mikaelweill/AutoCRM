@@ -3,6 +3,7 @@ import { AgentExecutor, createOpenAIToolsAgent } from 'langchain/agents'
 import { Tool } from '@langchain/core/tools'
 import { ChatPromptTemplate } from '@langchain/core/prompts'
 import { MessageType, MessageClassification, AgentResponse } from './types'
+import { LangChainTracer } from 'langchain/callbacks'
 
 // Define our tool interfaces
 interface ToolResult {
@@ -39,6 +40,9 @@ export async function createAssistantAgent() {
   }
 
   try {
+    // Initialize tracer
+    const tracer = new LangChainTracer()
+    
     // Initialize the LLM
     console.log('Initializing LLM...')
     const llm = new ChatOpenAI({
@@ -78,16 +82,7 @@ export async function createAssistantAgent() {
     return AgentExecutor.fromAgentAndTools({
       agent,
       tools: toolkit,
-      callbacks: [
-        {
-          handleAgentAction(action) {
-            console.log('Action:', action)
-          },
-          handleAgentEnd(action) {
-            console.log('Agent ended:', action)
-          }
-        }
-      ]
+      callbacks: [tracer],  // Use the LangChain tracer
     })
   } catch (error) {
     console.error('Error creating assistant agent:', error)
@@ -105,13 +100,17 @@ export async function processMessage(content: string): Promise<AgentResponse> {
     const result = await agent.invoke({ input: content })
     console.log('Agent result:', result)
 
+    // Get the run ID from the tracer
+    const runId = result.runId || undefined
+    console.log('Run ID:', runId)
+
     // Transform the result into our AgentResponse type
     return {
       content: result.output,
       type: determineMessageType(result),
       sources: [],  // We'll add these later
       actions: [],  // We'll add these later
-      trace_id: undefined
+      trace_id: runId
     }
   } catch (error) {
     console.error('Error in processMessage:', error)
