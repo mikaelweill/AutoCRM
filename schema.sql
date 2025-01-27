@@ -319,6 +319,17 @@ CREATE TABLE IF NOT EXISTS "public"."invitations" (
 ALTER TABLE "public"."invitations" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."knowledge_base_article_embeddings" (
+    "id" "uuid" NOT NULL,
+    "embedding" "public"."vector"(1536),
+    "article_text" "text",
+    "created_at" timestamp with time zone DEFAULT "timezone"('utc'::"text", "now"()) NOT NULL
+);
+
+
+ALTER TABLE "public"."knowledge_base_article_embeddings" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."knowledge_base_articles" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
     "title" "text" NOT NULL,
@@ -335,6 +346,17 @@ CREATE TABLE IF NOT EXISTS "public"."knowledge_base_articles" (
 
 
 ALTER TABLE "public"."knowledge_base_articles" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."knowledge_base_summary_embeddings" (
+    "id" "uuid" NOT NULL,
+    "embedding" "public"."vector"(1536),
+    "summary_text" "text",
+    "created_at" timestamp with time zone DEFAULT "timezone"('utc'::"text", "now"()) NOT NULL
+);
+
+
+ALTER TABLE "public"."knowledge_base_summary_embeddings" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."ticket_activities" (
@@ -454,8 +476,18 @@ ALTER TABLE ONLY "public"."invitations"
 
 
 
+ALTER TABLE ONLY "public"."knowledge_base_article_embeddings"
+    ADD CONSTRAINT "knowledge_base_article_embeddings_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."knowledge_base_articles"
     ADD CONSTRAINT "knowledge_base_articles_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."knowledge_base_summary_embeddings"
+    ADD CONSTRAINT "knowledge_base_summary_embeddings_pkey" PRIMARY KEY ("id");
 
 
 
@@ -526,6 +558,14 @@ CREATE INDEX "idx_tickets_status" ON "public"."tickets" USING "btree" ("status")
 
 
 
+CREATE INDEX "kb_article_embeddings_embedding_idx" ON "public"."knowledge_base_article_embeddings" USING "ivfflat" ("embedding" "public"."vector_cosine_ops") WITH ("lists"='100');
+
+
+
+CREATE INDEX "kb_summary_embeddings_embedding_idx" ON "public"."knowledge_base_summary_embeddings" USING "ivfflat" ("embedding" "public"."vector_cosine_ops") WITH ("lists"='100');
+
+
+
 CREATE INDEX "ticket_embeddings_embedding_idx" ON "public"."ticket_embeddings" USING "ivfflat" ("embedding" "public"."vector_cosine_ops") WITH ("lists"='100');
 
 
@@ -558,6 +598,11 @@ ALTER TABLE ONLY "public"."invitations"
 
 
 
+ALTER TABLE ONLY "public"."knowledge_base_article_embeddings"
+    ADD CONSTRAINT "knowledge_base_article_embeddings_id_fkey" FOREIGN KEY ("id") REFERENCES "public"."knowledge_base_articles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."knowledge_base_articles"
     ADD CONSTRAINT "knowledge_base_articles_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id");
 
@@ -565,6 +610,11 @@ ALTER TABLE ONLY "public"."knowledge_base_articles"
 
 ALTER TABLE ONLY "public"."knowledge_base_articles"
     ADD CONSTRAINT "knowledge_base_articles_last_updated_by_fkey" FOREIGN KEY ("last_updated_by") REFERENCES "public"."users"("id");
+
+
+
+ALTER TABLE ONLY "public"."knowledge_base_summary_embeddings"
+    ADD CONSTRAINT "knowledge_base_summary_embeddings_id_fkey" FOREIGN KEY ("id") REFERENCES "public"."knowledge_base_articles"("id") ON DELETE CASCADE;
 
 
 
@@ -1865,9 +1915,21 @@ GRANT ALL ON TABLE "public"."invitations" TO "service_role";
 
 
 
+GRANT ALL ON TABLE "public"."knowledge_base_article_embeddings" TO "anon";
+GRANT ALL ON TABLE "public"."knowledge_base_article_embeddings" TO "authenticated";
+GRANT ALL ON TABLE "public"."knowledge_base_article_embeddings" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."knowledge_base_articles" TO "anon";
 GRANT ALL ON TABLE "public"."knowledge_base_articles" TO "authenticated";
 GRANT ALL ON TABLE "public"."knowledge_base_articles" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."knowledge_base_summary_embeddings" TO "anon";
+GRANT ALL ON TABLE "public"."knowledge_base_summary_embeddings" TO "authenticated";
+GRANT ALL ON TABLE "public"."knowledge_base_summary_embeddings" TO "service_role";
 
 
 
