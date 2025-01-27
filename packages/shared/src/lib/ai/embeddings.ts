@@ -2,10 +2,11 @@ import { OpenAI } from 'openai';
 import { createServerClient } from '../supabase-server';
 import { Ticket } from '../../types/tickets';
 import { TicketPriority } from '../../config/tickets';
-import { Database } from '../database.types';
+import { Database } from '../../types/database';
 
 type TicketRow = Database['public']['Tables']['tickets']['Row'];
 type TicketActivity = Database['public']['Tables']['ticket_activities']['Row'];
+type KBArticle = Database['public']['Tables']['knowledge_base_articles']['Row'];
 
 export async function generateEmbedding(text: string) {
   const openai = new OpenAI({
@@ -249,6 +250,131 @@ export async function storeKBArticleEmbedding(article: KBArticleEmbeddingData) {
 
   } catch (error) {
     console.error('Error in storeKBArticleEmbedding:', error);
+    throw error;
+  }
+}
+
+export async function generateKBArticleSummary(article: KBArticle) {
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+  });
+
+  try {
+    console.log('Generating summary for KB article:', article.id);
+    
+    const prompt = `
+      Please create a concise summary of this knowledge base article.
+      Keep the summary informative but brief (2-3 sentences).
+      
+      Title: ${article.title}
+      Category: ${article.category}
+      Content: ${article.content}
+    `.trim();
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are a technical writer creating concise summaries of knowledge base articles. Focus on the key points and main takeaways."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.3, // Lower temperature for more consistent summaries
+      max_tokens: 150  // Limit summary length
+    });
+
+    const summary = response.choices[0].message.content?.trim();
+    if (!summary) {
+      throw new Error('No summary generated');
+    }
+
+    console.log('Summary generated successfully');
+    return summary;
+
+  } catch (error) {
+    console.error('Error generating KB article summary:', error);
+    throw error;
+  }
+}
+
+interface KBSummaryData {
+  id: string;
+  title: string;
+  category: string;
+  summary: string;
+}
+
+export async function generateKBSummaryEmbedding(summaryData: KBSummaryData) {
+  // Combine relevant summary text
+  const summaryText = `
+    Title: ${summaryData.title}
+    Category: ${summaryData.category}
+    Summary: ${summaryData.summary}
+  `.trim();
+
+  return {
+    embedding: await generateEmbedding(summaryText),
+    summaryText
+  };
+}
+
+export async function storeKBSummaryEmbedding(summaryData: KBSummaryData) {
+  const supabase = createServerClient();
+  
+  try {
+    console.log('Generating embedding for KB summary:', summaryData.id);
+    
+    // Generate embedding
+    const { embedding, summaryText } = await generateKBSummaryEmbedding(summaryData);
+
+    console.log('Storing KB summary embedding...');
+    // Store embedding
+    const { error: storeError } = await supabase
+      .from('knowledge_base_summary_embeddings')
+      .upsert({
+        id: summaryData.id,
+        embedding,
+        summary_text: summaryText,
+      });
+
+    if (storeError) {
+      console.error('Error storing KB summary embedding:', storeError);
+      throw storeError;
+    }
+
+    console.log('KB summary embedding stored successfully');
+    return true;
+
+  } catch (error) {
+    console.error('Error in storeKBSummaryEmbedding:', error);
+    throw error;
+  }
+}
+
+export async function generateAndStoreSummaryEmbedding(article: KBArticle) {
+  try {
+    console.log('Generating summary and embedding for article:', article.id);
+    
+    // First generate the summary
+    const summary = await generateKBArticleSummary(article);
+    
+    // Then store its embedding
+    await storeKBSummaryEmbedding({
+      id: article.id,
+      title: article.title,
+      category: article.category,
+      summary: summary
+    });
+
+    console.log('Summary embedding generated and stored successfully');
+    return true;
+
+  } catch (error) {
+    console.error('Error in generateAndStoreSummaryEmbedding:', error);
     throw error;
   }
 } 
