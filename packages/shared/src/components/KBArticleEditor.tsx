@@ -42,8 +42,8 @@ export function KBArticleEditor({
   }
 
   return (
-    <Card className="max-w-4xl mx-auto">
-      <CardHeader className="space-y-4">
+    <Card className="h-full flex flex-col">
+      <CardHeader className="space-y-4 flex-shrink-0">
         <div className="space-y-4">
           <input
             type="text"
@@ -72,16 +72,16 @@ export function KBArticleEditor({
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="prose max-w-none">
+      <CardContent className="flex-grow flex flex-col h-full">
+        <div className="prose max-w-none flex-grow">
           <Textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="Write your article content here..."
-            className="w-full min-h-[400px] border-0 focus:ring-0 text-base"
+            className="w-full h-full min-h-[calc(100vh-400px)] border-0 focus:ring-0 text-base resize-none"
           />
         </div>
-        <div className="mt-6 flex justify-end space-x-4">
+        <div className="mt-6 flex justify-end space-x-4 flex-shrink-0">
           <button
             onClick={onCancel}
             className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-500"

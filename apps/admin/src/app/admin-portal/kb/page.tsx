@@ -80,18 +80,6 @@ export default function KBPage() {
         throw new Error('No data returned after update')
       }
 
-      // Generate embedding for updated article
-      await fetch('/api/kb-embeddings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: data.id,
-          title: data.title,
-          content: data.content,
-          category: data.category
-        })
-      })
-
       // Update the articles list with the updated article
       setArticles(articles.map(article => 
         article.id === selectedArticle.id ? data : article
@@ -100,6 +88,22 @@ export default function KBPage() {
       // Update the selected article and exit edit mode
       setSelectedArticle(data)
       setIsEditing(false)
+
+      // Generate embedding for updated article in the background
+      fetch('/api/kb-embeddings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: data.id,
+          title: data.title,
+          content: data.content,
+          category: data.category
+        })
+      }).catch(err => {
+        console.error('Error generating embeddings:', err)
+        // We don't throw here since it's a background operation
+      })
+
     } catch (err) {
       console.error('Error updating article:', err)
       alert(err instanceof Error ? err.message : 'Failed to update article')
@@ -132,8 +136,14 @@ export default function KBPage() {
         throw new Error('No data returned after insert')
       }
 
-      // Generate embedding for new article
-      await fetch('/api/kb-embeddings', {
+      // Add the new article to the list
+      setArticles([data, ...articles])
+
+      // Close the create dialog
+      setIsCreating(false)
+
+      // Generate embedding for new article in the background
+      fetch('/api/kb-embeddings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -142,13 +152,11 @@ export default function KBPage() {
           content: data.content,
           category: data.category
         })
+      }).catch(err => {
+        console.error('Error generating embeddings:', err)
+        // We don't throw here since it's a background operation
       })
 
-      // Add the new article to the list
-      setArticles([data, ...articles])
-
-      // Close the create dialog
-      setIsCreating(false)
     } catch (err) {
       console.error('Error creating article:', err)
       alert(err instanceof Error ? err.message : 'Failed to create article')
@@ -183,8 +191,9 @@ export default function KBPage() {
             setIsEditing(false)
           }}
           title={isEditing ? 'Edit Article' : selectedArticle.title}
+          className="w-full max-w-[90vw] h-[90vh] overflow-y-auto"
         >
-          <div className="max-w-4xl mx-auto">
+          <div className="h-full">
             {isEditing ? (
               <KBArticleEditor
                 article={selectedArticle}
@@ -207,8 +216,9 @@ export default function KBPage() {
         isOpen={isCreating}
         onClose={handleCancelCreate}
         title="Create New Article"
+        className="w-full max-w-[90vw] h-[90vh] overflow-y-auto"
       >
-        <div className="max-w-4xl mx-auto">
+        <div className="h-full">
           <KBArticleEditor
             onSave={handleCreateArticle}
             onCancel={handleCancelCreate}

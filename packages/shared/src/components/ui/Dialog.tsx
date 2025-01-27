@@ -38,7 +38,7 @@ export function Dialog({ isOpen, onClose, title, children }: DialogProps) {
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <HeadlessDialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+              <HeadlessDialog.Panel className="w-full max-w-[90vw] h-[90vh] transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
                 <HeadlessDialog.Title
                   as="div"
                   className="flex items-center justify-between border-b pb-4 mb-4"
@@ -55,7 +55,9 @@ export function Dialog({ isOpen, onClose, title, children }: DialogProps) {
                     <XMarkIcon className="h-6 w-6" aria-hidden="true" />
                   </button>
                 </HeadlessDialog.Title>
-                {children}
+                <div className="overflow-y-auto h-[calc(90vh-120px)]">
+                  {children}
+                </div>
               </HeadlessDialog.Panel>
             </Transition.Child>
           </div>
