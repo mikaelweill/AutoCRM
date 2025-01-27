@@ -195,4 +195,60 @@ export async function updateTicketEmbeddingWithComments(ticketId: string) {
     console.error('Error updating ticket embedding with comments:', error);
     throw error;
   }
+}
+
+interface KBArticleEmbeddingData {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  subcategory?: string;
+}
+
+export async function generateKBArticleEmbedding(article: KBArticleEmbeddingData) {
+  // Combine relevant article text
+  const articleText = `
+    Title: ${article.title}
+    Category: ${article.category}
+    ${article.subcategory ? `Subcategory: ${article.subcategory}` : ''}
+    Content: ${article.content}
+  `.trim();
+
+  return {
+    embedding: await generateEmbedding(articleText),
+    articleText
+  };
+}
+
+export async function storeKBArticleEmbedding(article: KBArticleEmbeddingData) {
+  const supabase = createServerClient();
+  
+  try {
+    console.log('Generating embedding for KB article:', article.id);
+    
+    // Generate embedding
+    const { embedding, articleText } = await generateKBArticleEmbedding(article);
+
+    console.log('Storing KB article embedding...');
+    // Store embedding
+    const { error: storeError } = await supabase
+      .from('knowledge_base_article_embeddings')
+      .upsert({
+        id: article.id,
+        embedding,
+        article_text: articleText,
+      });
+
+    if (storeError) {
+      console.error('Error storing KB article embedding:', storeError);
+      throw storeError;
+    }
+
+    console.log('KB article embedding stored successfully');
+    return true;
+
+  } catch (error) {
+    console.error('Error in storeKBArticleEmbedding:', error);
+    throw error;
+  }
 } 

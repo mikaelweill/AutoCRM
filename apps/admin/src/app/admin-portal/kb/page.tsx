@@ -80,6 +80,18 @@ export default function KBPage() {
         throw new Error('No data returned after update')
       }
 
+      // Generate embedding for updated article
+      await fetch('/api/kb-embeddings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: data.id,
+          title: data.title,
+          content: data.content,
+          category: data.category
+        })
+      })
+
       // Update the articles list with the updated article
       setArticles(articles.map(article => 
         article.id === selectedArticle.id ? data : article
@@ -119,6 +131,18 @@ export default function KBPage() {
       if (!data) {
         throw new Error('No data returned after insert')
       }
+
+      // Generate embedding for new article
+      await fetch('/api/kb-embeddings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: data.id,
+          title: data.title,
+          content: data.content,
+          category: data.category
+        })
+      })
 
       // Add the new article to the list
       setArticles([data, ...articles])
