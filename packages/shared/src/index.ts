@@ -1,5 +1,6 @@
 // Components
 export * from './components'
+export * from './components/ChatWindow'
 
 // Services
 export {
@@ -32,5 +33,4 @@ export * from './config/layout'
 // Utils
 export * from './lib/utils'
 export * from './lib/supabase'
-
 // Remove AI exports for now until we have the basic embedding working

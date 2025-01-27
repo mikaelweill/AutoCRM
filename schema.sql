@@ -303,6 +303,22 @@ CREATE TABLE IF NOT EXISTS "public"."attachments" (
 ALTER TABLE "public"."attachments" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."chat_messages" (
+    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
+    "agent_id" "uuid",
+    "session_id" "uuid" NOT NULL,
+    "content" "text" NOT NULL,
+    "sender" "text",
+    "langsmith_trace_id" "text",
+    "success" boolean,
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    CONSTRAINT "chat_messages_sender_check" CHECK (("sender" = ANY (ARRAY['agent'::"text", 'assistant'::"text"])))
+);
+
+
+ALTER TABLE "public"."chat_messages" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "public"."invitations" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "email" "text" NOT NULL,
@@ -466,6 +482,11 @@ ALTER TABLE ONLY "public"."attachments"
 
 
 
+ALTER TABLE ONLY "public"."chat_messages"
+    ADD CONSTRAINT "chat_messages_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."invitations"
     ADD CONSTRAINT "invitations_pkey" PRIMARY KEY ("id");
 
@@ -588,6 +609,11 @@ ALTER TABLE ONLY "public"."attachments"
 
 
 
+ALTER TABLE ONLY "public"."chat_messages"
+    ADD CONSTRAINT "chat_messages_agent_id_fkey" FOREIGN KEY ("agent_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."invitations"
     ADD CONSTRAINT "invitations_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id");
 
@@ -703,6 +729,10 @@ CREATE POLICY "Agents and admins can view all articles" ON "public"."knowledge_b
 
 
 
+CREATE POLICY "Agents can see their own messages" ON "public"."chat_messages" USING (("auth"."uid"() = "agent_id"));
+
+
+
 CREATE POLICY "Agents can update tickets" ON "public"."tickets" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM "public"."users"
   WHERE (("users"."id" = "auth"."uid"()) AND ("users"."role" = ANY (ARRAY['agent'::"public"."user_role", 'admin'::"public"."user_role"]))))));
@@ -792,13 +822,28 @@ CREATE POLICY "admins can delete" ON "public"."tickets" FOR DELETE USING ((EXIST
 ALTER TABLE "public"."attachments" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."chat_messages" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."invitations" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."knowledge_base_article_embeddings" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."knowledge_base_articles" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."knowledge_base_summary_embeddings" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."ticket_activities" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."ticket_emails" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."ticket_embeddings" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."tickets" ENABLE ROW LEVEL SECURITY;
@@ -1906,6 +1951,12 @@ GRANT ALL ON FUNCTION "public"."sum"("public"."vector") TO "service_role";
 GRANT ALL ON TABLE "public"."attachments" TO "anon";
 GRANT ALL ON TABLE "public"."attachments" TO "authenticated";
 GRANT ALL ON TABLE "public"."attachments" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."chat_messages" TO "anon";
+GRANT ALL ON TABLE "public"."chat_messages" TO "authenticated";
+GRANT ALL ON TABLE "public"."chat_messages" TO "service_role";
 
 
 

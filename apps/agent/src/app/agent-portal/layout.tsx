@@ -5,6 +5,7 @@ import { useAuth } from "shared/src/contexts/AuthContext"
 import { useRouter } from "next/navigation"
 import { useEffect, useRef } from "react"
 import { hasRequiredRole } from "shared/src/auth/utils"
+import { ChatWindow } from "shared"
 
 const agentNavLinks = [
   { href: '/agent-portal', label: 'Dashboard' },
@@ -45,6 +46,7 @@ export default function AgentLayout({
       <Navigation links={agentNavLinks} title="Agent Portal" />
       <main className="flex-1 overflow-auto">
         {children}
+        <ChatWindow />
       </main>
     </div>
   )

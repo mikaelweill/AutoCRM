@@ -1,88 +1,157 @@
 # AI Features Documentation
 
+## System Vision
+
+### Ticket Processing Flow
+```
+Client Creates Ticket → AI Quick Analysis
+                       ↓
+        ┌─────────────┼────────────────┐
+        ↓             ↓                ↓
+   Full AI Handle  AI Assist       No AI Help
+        ↓             ↓                ↓
+   AI Queue     Agent Queue +    Agent Queue
+                AI Context
+```
+
+### 1. AI Decision Tiers
+#### Tier 1: Full AI Handling ✨
+- AI confidently handles and closes tickets
+- Appears in dedicated AI Queue for oversight
+- Agents can review AI's work and reasoning
+- Complete RAG context preserved for inspection
+
+#### Tier 2: AI Assistance 🤝
+- AI prepares response but doesn't claim ticket
+- Provides RAG context (similar tickets + KB articles)
+- Draft response available when agent claims ticket
+- Agent can leverage or modify AI's work
+
+#### Tier 3: Direct to Agent 👤
+- AI determines human expertise needed
+- No preliminary response drafted
+- Ticket goes directly to regular agent queue
+
+### Current Progress
+
+#### Phase 1: Core Infrastructure ✅
+- Embedding generation for tickets and KB
+- Real-time processing capability
+- Background task handling
+- Database schema and relationships
+
+#### Phase 2: RAG Implementation 🔄
+1. **Knowledge Integration**
+   - KB article similarity search
+   - Cross-type similarity matching
+   - Performance optimization
+
+2. **AI Analysis Pipeline**
+   - Quick analysis system for tier decision
+   - Response generation for Tiers 1 & 2
+   - Confidence scoring mechanism
+   - RAG context building
+
+#### Phase 3: Agent Portal Integration 🎯
+1. **New AI Queue**
+   - Display AI-handled tickets
+   - Show confidence scores
+   - Provide RAG context viewer
+   - Enable agent oversight
+
+2. **Enhanced Agent Queue**
+   - AI assistance integration
+   - Draft response display
+   - RAG context accessibility
+   - Easy draft modification
+
+## Success Metrics
+
+### Technical Performance
+- Quick analysis < 1s
+- RAG retrieval < 200ms
+- Response generation < 3s
+- Cross-type search accuracy > 80%
+
+### Business Metrics
+- AI full handle rate: target 20-30%
+- AI assist accuracy > 85%
+- Agent time saved > 40%
+- Customer satisfaction maintained/improved
+
+### Quality Assurance
+- AI decision accuracy > 90%
+- Response quality score > 85%
+- Agent intervention rate < 15% for AI-handled tickets
+- RAG relevance score > 80%
+
+## Next Steps
+1. Complete RAG implementation
+2. Build quick analysis system
+3. Develop AI Queue interface
+4. Integrate AI assistance into agent workflow
+5. Implement monitoring and metrics
+
+*Note: This vision focuses on augmenting agent capabilities rather than replacing them, ensuring high-quality support while improving efficiency.*
+
 ## Current Implementation Status
 
-### Phase 1: Vector Embeddings Implementation ✅
-We have successfully implemented ticket embeddings with two parallel flows:
+### Phase 1: Core Embeddings ✅
+Successfully implemented embedding generation and storage for tickets and KB content:
 
+#### 1. Ticket Embeddings ✅
 ```typescript
-// Web Flow (Implemented ✅)
-Client Creates Ticket → Store Embedding → Find Similar Tickets
-                    └→ Normal Ticket Flow
-                    └→ Delete Flow (Implemented ✅): Delete Ticket → Delete Embedding
-
-// Email Flow (Planned)
-Email → Edge Function → Store Embedding → Find Similar Tickets
-                    └→ Normal Ticket Flow
+// Core Functions
+- generateEmbedding(text: string) ✅
+- generateTicketEmbedding(ticket: Ticket) ✅
+- storeAndFindSimilarTickets(ticket: TicketEmbeddingData) ✅
+- updateTicketEmbeddingWithComments(ticketId: string) ✅
 ```
 
-#### 1. Current Components
+#### 2. Knowledge Base Embeddings ✅
 ```typescript
-// Core embedding functions - All Implemented ✅
-interface TicketEmbedding {
-  id: string;
-  embedding: number[];
-  ticket_text: string;
-  ticket_id: string; // Foreign key with cascade delete
-}
+// Article Functions
+- generateKBArticleEmbedding(article: KBArticleEmbeddingData) ✅
+- storeKBArticleEmbedding(article: KBArticleEmbeddingData) ✅
 
-// Planned KB Components
-interface KBArticleEmbedding {
-  id: string;
-  embedding: number[];
-  article_text: string;
-  article_id: string; // Foreign key with cascade delete
-}
-
-interface KBSummaryEmbedding {
-  id: string;
-  embedding: number[];
-  summary_text: string;
-  summary_id: string; // Foreign key with cascade delete
-}
-
-// Functions implemented and tested ✅:
-- generateEmbedding(text: string)
-- generateTicketEmbedding(ticket: Ticket)
-- storeAndFindSimilarTickets(ticket: Ticket)
-- updateTicketEmbeddingWithComments(ticketId: string)
-- deleteTicketEmbedding(ticketId: string)
+// Summary Functions
+- generateKBSummaryEmbedding(summaryData: KBSummaryData) ✅
+- storeKBSummaryEmbedding(summaryData: KBSummaryData) ✅
+- generateAndStoreSummaryEmbedding(article: KBArticle) ✅
 ```
 
-#### 2. Implementation Progress
-1. **Web Ticket Creation & Management**
-   - ✅ Integrated embeddings with `createTicket` function
-   - ✅ Implemented ticket and embedding synchronization
-   - ✅ Added cascading deletion for tickets and their embeddings
-   - ✅ Added admin-only delete functionality with RLS policies
-   - ✅ Fixed OpenAI dependency and build issues
+#### 3. API Integration ✅
+- Ticket embeddings API endpoint ✅
+- KB embeddings API endpoint with background processing ✅
+- Non-blocking UI updates for better UX ✅
 
-2. **Comment Updates**
-   - ✅ Implemented comment-based embedding updates
-   - ✅ Synchronized ticket text with latest comments
-   - ✅ Tested and validated with real conversations
-   - 🔄 Monitoring performance
+### Phase 2: Similarity Search & RAG 🔄
 
-3. **Knowledge Base Integration** (Next Phase)
-   - ✅ Database schema created with proper foreign keys
-   - ✅ Tables set up: `knowledge_base_article_embeddings` and `knowledge_base_summary_embeddings`
-   - Next steps:
-     - Implement KB article embedding generation
-     - Implement KB summary embedding generation
-     - Add similarity search across all embedding types
-     - Add monitoring and performance metrics
+#### Current Focus
+1. **Knowledge Base Search**
+   - Implement similarity search across KB articles
+   - Add cross-type similarity search (tickets ↔ KB articles)
+   - Optimize search performance and relevance
 
-4. **Email Integration** (Future)
-   - Implement in Edge Function
-   - Maintain consistency with web flow
-   - Add monitoring
+2. **RAG Implementation**
+   - Set up retrieval pipeline
+   - Implement context building
+   - Add source verification
+   - Integrate with existing embedding system
 
-### Success Metrics for Phase 1
-- ✅ Embedding generation < 1s
-- ✅ Similarity search accuracy > 80%
-- ✅ Successful embedding updates on comments
-- ✅ System stability and error handling
-- 🔄 Cross-content type similarity search performance (Pending KB integration)
+3. **Performance Optimization**
+   - Target response times:
+     - Similar article search < 200ms
+     - Cross-type search < 300ms
+   - Accuracy targets:
+     - Similar article matching > 85%
+     - Cross-type relevance > 80%
+
+### Phase 3: Email Integration (Planned)
+- Edge function implementation
+- Email parsing and embedding
+- Real-time ticket creation
+- Attachment handling
 
 ## Implementation Plan (Phase 1)
 
@@ -496,3 +565,54 @@ Three-tier approach:
 
 ---
 *Note: This document should be updated as requirements evolve and new features are identified.* 
+
+## Implementation Plan
+
+### Phase 1: Vector Embeddings ✅
+- Core embedding functions all implemented
+- Ticket embeddings working and tested
+- Comment updates working
+- Delete flow implemented with cascading deletes
+- Admin-only delete functionality with RLS policies
+
+### Phase 2: Knowledge Base Integration 🔄
+- Database schema created for KB article and summary embeddings ✅
+- Foreign key constraints ensure data integrity ✅
+- Core embedding functions implemented:
+  - `generateKBArticleEmbedding` ✅
+  - `storeKBArticleEmbedding` ✅
+  - `generateKBSummaryEmbedding` ✅
+  - `storeKBSummaryEmbedding` ✅
+- API endpoints created for KB embeddings ✅
+- Background processing for embeddings to improve UX ✅
+- UI improvements:
+  - Larger editor modal for better content creation ✅
+  - Non-blocking embedding generation ✅
+- Next steps:
+  - Implement similarity search across KB articles
+  - Add cross-type similarity search (tickets ↔ KB articles)
+  - Add summary generation for KB articles
+
+### Phase 3: Email Integration
+- Planned features remain unchanged
+- Will begin after KB integration is complete
+
+## Success Metrics
+
+### Phase 1 ✅
+- Ticket embeddings successfully stored and retrieved
+- Similar tickets found efficiently
+- Comments properly update embeddings
+- Deletion cascades work correctly
+
+### Phase 2 (In Progress)
+- KB article embeddings stored successfully ✅
+- Background processing ensures smooth UX ✅
+- Editor UI optimized for content creation ✅
+- Remaining goals:
+  - Similar article search response time < 200ms
+  - Cross-type similarity search accuracy > 80%
+  - Summary generation quality meets standards
+
+### Phase 3
+- Metrics to be defined based on email integration requirements 

@@ -1,4 +1,6 @@
 export * from './Button'
 export * from './Dialog'
 export * from './Modal'
-export * from './Textarea' 
+export * from './Textarea'
+export * from './Input'
+export * from './ScrollArea' 
