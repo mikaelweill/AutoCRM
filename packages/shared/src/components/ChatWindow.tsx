@@ -138,7 +138,7 @@ export function ChatWindow({ className }: ChatWindowProps) {
   return (
     <div 
       className={cn(
-        "fixed bottom-4 right-4 w-[450px] bg-background border rounded-lg shadow-xl transition-all duration-200",
+        "fixed bottom-4 right-4 w-[450px] bg-white border rounded-lg shadow-xl transition-all duration-200",
         !isOpen ? "h-14" : "h-[600px]",
         className
       )}
