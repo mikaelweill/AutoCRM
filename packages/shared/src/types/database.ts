@@ -611,6 +611,45 @@ export type Database = {
             }
             Returns: unknown
           }
+      match_kb_articles: {
+        Args: {
+          query_embedding: string
+          match_threshold?: number
+          match_count?: number
+        }
+        Returns: {
+          id: string
+          title: string
+          content: string
+          category: string
+          subcategory: string
+          created_at: string
+          updated_at: string
+          is_published: boolean
+          metadata: Json
+          similarity: number
+        }[]
+      }
+      match_kb_summaries: {
+        Args: {
+          query_embedding: string
+          match_threshold?: number
+          match_count?: number
+        }
+        Returns: {
+          id: string
+          title: string
+          content: string
+          category: string
+          subcategory: string
+          created_at: string
+          updated_at: string
+          is_published: boolean
+          metadata: Json
+          summary_text: string
+          similarity: number
+        }[]
+      }
       match_tickets: {
         Args: {
           query_embedding: string
@@ -618,7 +657,18 @@ export type Database = {
           match_count: number
         }
         Returns: {
-          id: number
+          id: string
+          number: number
+          subject: string
+          description: string
+          status: Database["public"]["Enums"]["ticket_status"]
+          priority: Database["public"]["Enums"]["ticket_priority"]
+          created_at: string
+          updated_at: string
+          resolved_at: string
+          metadata: Json
+          client: Json
+          agent: Json
           similarity: number
         }[]
       }

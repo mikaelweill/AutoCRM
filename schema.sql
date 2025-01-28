@@ -264,19 +264,104 @@ $$;
 ALTER FUNCTION "public"."invitations_before_insert"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."match_tickets"("query_embedding" "public"."vector", "match_threshold" double precision, "match_count" integer) RETURNS TABLE("id" bigint, "similarity" double precision)
+CREATE OR REPLACE FUNCTION "public"."match_kb_articles"("query_embedding" "public"."vector", "match_threshold" double precision DEFAULT 0.0, "match_count" integer DEFAULT 5) RETURNS TABLE("id" "uuid", "title" "text", "content" "text", "category" "text", "subcategory" "text", "created_at" timestamp with time zone, "updated_at" timestamp with time zone, "is_published" boolean, "metadata" "jsonb", "similarity" double precision)
     LANGUAGE "plpgsql"
     AS $$
-begin
-  return query
-  select
-    ticket_embeddings.id,
-    1 - (ticket_embeddings.embedding <=> query_embedding) as similarity
-  from ticket_embeddings
-  where 1 - (ticket_embeddings.embedding <=> query_embedding) > match_threshold
-  order by ticket_embeddings.embedding <=> query_embedding
-  limit match_count;
-end;
+BEGIN
+  RETURN QUERY
+  SELECT 
+    kb.id,
+    kb.title,
+    kb.content,
+    kb.category,
+    kb.subcategory,
+    kb.created_at,
+    kb.updated_at,
+    kb.is_published,
+    kb.metadata,
+    1 - (kbe.embedding <=> query_embedding) as similarity
+  FROM knowledge_base_articles kb
+  JOIN knowledge_base_article_embeddings kbe ON kb.id = kbe.id
+  WHERE 1 - (kbe.embedding <=> query_embedding) > match_threshold
+    AND kb.is_published = true
+  ORDER BY similarity DESC
+  LIMIT match_count;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."match_kb_articles"("query_embedding" "public"."vector", "match_threshold" double precision, "match_count" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."match_kb_summaries"("query_embedding" "public"."vector", "match_threshold" double precision DEFAULT 0.0, "match_count" integer DEFAULT 5) RETURNS TABLE("id" "uuid", "title" "text", "content" "text", "category" "text", "subcategory" "text", "created_at" timestamp with time zone, "updated_at" timestamp with time zone, "is_published" boolean, "metadata" "jsonb", "summary_text" "text", "similarity" double precision)
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    kb.id,
+    kb.title,
+    kb.content,
+    kb.category,
+    kb.subcategory,
+    kb.created_at,
+    kb.updated_at,
+    kb.is_published,
+    kb.metadata,
+    kbs.summary_text,
+    1 - (kbs.embedding <=> query_embedding) as similarity
+  FROM knowledge_base_articles kb
+  JOIN knowledge_base_summary_embeddings kbs ON kb.id = kbs.id
+  WHERE 1 - (kbs.embedding <=> query_embedding) > match_threshold
+    AND kb.is_published = true
+  ORDER BY similarity DESC
+  LIMIT match_count;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."match_kb_summaries"("query_embedding" "public"."vector", "match_threshold" double precision, "match_count" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."match_tickets"("query_embedding" "public"."vector", "match_threshold" double precision, "match_count" integer) RETURNS TABLE("id" "uuid", "number" integer, "subject" "text", "description" "text", "status" "public"."ticket_status", "priority" "public"."ticket_priority", "created_at" timestamp with time zone, "updated_at" timestamp with time zone, "resolved_at" timestamp with time zone, "metadata" "jsonb", "client" "jsonb", "agent" "jsonb", "similarity" double precision)
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    t.id,
+    t.number,
+    t.subject,
+    t.description,
+    t.status,
+    t.priority,
+    t.created_at,
+    t.updated_at,
+    t.resolved_at,
+    t.metadata,
+    -- Build client JSON object
+    jsonb_build_object(
+      'id', c.id,
+      'email', c.email,
+      'full_name', c.full_name
+    ) as client,
+    -- Build agent JSON object
+    jsonb_build_object(
+      'id', a.id,
+      'email', a.email,
+      'full_name', a.full_name
+    ) as agent,
+    -- Similarity score
+    1 - (te.embedding <=> query_embedding) as similarity
+  FROM 
+    ticket_embeddings te
+    JOIN tickets t ON t.id = te.id
+    LEFT JOIN users c ON t.client_id = c.id  -- client
+    LEFT JOIN users a ON t.agent_id = a.id   -- agent
+  WHERE 1 - (te.embedding <=> query_embedding) > match_threshold
+  ORDER BY similarity DESC
+  LIMIT match_count;
+END;
 $$;
 
 
@@ -306,7 +391,6 @@ ALTER TABLE "public"."attachments" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."chat_messages" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
     "agent_id" "uuid",
-    "session_id" "uuid" NOT NULL,
     "content" "text" NOT NULL,
     "sender" "text",
     "langsmith_trace_id" "text",
@@ -764,6 +848,12 @@ CREATE POLICY "Clients can update own tickets" ON "public"."tickets" FOR UPDATE 
 CREATE POLICY "Clients can view own tickets + other everyone" ON "public"."tickets" FOR SELECT TO "authenticated" USING ((("client_id" = "auth"."uid"()) OR (EXISTS ( SELECT 1
    FROM "public"."users"
   WHERE (("users"."id" = "auth"."uid"()) AND ("users"."role" = ANY (ARRAY['agent'::"public"."user_role", 'admin'::"public"."user_role"])))))));
+
+
+
+CREATE POLICY "Enable read access for admins and agents" ON "public"."ticket_emails" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."users"
+  WHERE (("users"."id" = "auth"."uid"()) AND ("users"."role" = ANY (ARRAY['admin'::"public"."user_role", 'agent'::"public"."user_role"]))))));
 
 
 
@@ -1679,6 +1769,18 @@ GRANT ALL ON FUNCTION "public"."l2_normalize"("public"."vector") TO "postgres";
 GRANT ALL ON FUNCTION "public"."l2_normalize"("public"."vector") TO "anon";
 GRANT ALL ON FUNCTION "public"."l2_normalize"("public"."vector") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."l2_normalize"("public"."vector") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."match_kb_articles"("query_embedding" "public"."vector", "match_threshold" double precision, "match_count" integer) TO "anon";
+GRANT ALL ON FUNCTION "public"."match_kb_articles"("query_embedding" "public"."vector", "match_threshold" double precision, "match_count" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."match_kb_articles"("query_embedding" "public"."vector", "match_threshold" double precision, "match_count" integer) TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."match_kb_summaries"("query_embedding" "public"."vector", "match_threshold" double precision, "match_count" integer) TO "anon";
+GRANT ALL ON FUNCTION "public"."match_kb_summaries"("query_embedding" "public"."vector", "match_threshold" double precision, "match_count" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."match_kb_summaries"("query_embedding" "public"."vector", "match_threshold" double precision, "match_count" integer) TO "service_role";
 
 
 

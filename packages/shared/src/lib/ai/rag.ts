@@ -71,6 +71,19 @@ interface KBSearchResult {
   similarity: number;
 }
 
+interface KBMatchResult {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  subcategory: string | null;
+  created_at: string;
+  updated_at: string;
+  is_published: boolean;
+  metadata: JsonValue;
+  similarity: number;
+}
+
 class RAGService extends BaseService {
   protected supabase = createServerClient()  // Use server client with service role
 
@@ -191,39 +204,47 @@ class RAGService extends BaseService {
   // Helper to perform vector search on KB articles
   private async searchKBArticles(embedding: number[], limit: number): Promise<KBSearchResult[]> {
     console.log(`[RAG] Searching KB articles with embedding of length ${embedding.length}, limit ${limit}`);
-    // TODO: Implement devectorized KB article search similar to tickets
-    const { data, error } = await this.supabase
+    
+    // First check if we have any embeddings at all
+    const { count, error: countError } = await this.supabase
       .from('knowledge_base_article_embeddings')
-      .select(`        id,
-        article:id(
-          id,
-          title,
-          content,
-          category,
-          subcategory,
-          created_at,
-          updated_at,
-          is_published,
-          metadata
-        )
-      `)
-      .limit(limit);
+      .select('id', { count: 'exact' })
+    
+    console.log(`[RAG] Found ${count || 0} total KB article embeddings in database`);
+    
+    if (countError) {
+      console.error('[RAG] Error checking KB article embeddings:', countError);
+      throw countError;
+    }
+    
+    // Get matches using vector similarity search
+    const { data: matches, error } = await this.supabase
+      .rpc('match_kb_articles', {
+        query_embedding: embedding as unknown as string,
+        match_threshold: 0,
+        match_count: limit
+      }) as { data: KBMatchResult[] | null, error: any };
 
     if (error) {
       console.error('[RAG] Error searching KB articles:', error);
       throw error;
     }
-    console.log(`[RAG] Found ${data?.length || 0} KB articles`);
-    if (data?.length) {
-      console.log('[RAG] KB article matches:', data.map(d => ({
-        title: d.article.title,
-        category: d.article.category
+
+    if (!matches) {
+      console.log('[RAG] No KB article matches found');
+      return [];
+    }
+
+    console.log(`[RAG] Found ${matches.length} matching KB articles with similarity >= 0`);
+    if (matches.length > 0) {
+      console.log('[RAG] Top KB article matches:', matches.map(m => ({
+        title: m.title,
+        category: m.category,
+        similarity: m.similarity
       })));
     }
-    return (data || []).map(d => ({
-      ...d.article,
-      similarity: 0.8 // TODO: Implement proper similarity calculation
-    })) as KBSearchResult[];
+
+    return matches;
   }
 
   // Main RAG function
@@ -231,7 +252,7 @@ class RAGService extends BaseService {
     ticketNumber,
     searchQuery,
     searchTypes = ['tickets', 'kb'],
-    limit = 5
+    limit = 3
   }: RAGQuery): Promise<RagResult> {
     console.log('[RAG] Starting search with params:', {
       ticketNumber,
