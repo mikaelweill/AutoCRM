@@ -3,15 +3,17 @@
 import { Fragment } from 'react'
 import { Dialog as HeadlessDialog, Transition } from '@headlessui/react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
+import { cn } from '../../lib/utils'
 
 interface DialogProps {
   isOpen: boolean
   onClose: () => void
   title: string
   children: React.ReactNode
+  size?: 'default' | 'large'  // Add size prop with default and large options
 }
 
-export function Dialog({ isOpen, onClose, title, children }: DialogProps) {
+export function Dialog({ isOpen, onClose, title, children, size = 'default' }: DialogProps) {
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <HeadlessDialog as="div" className="relative z-50" onClose={onClose}>
@@ -38,7 +40,12 @@ export function Dialog({ isOpen, onClose, title, children }: DialogProps) {
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <HeadlessDialog.Panel className="w-full max-w-[90vw] h-[90vh] transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+              <HeadlessDialog.Panel className={cn(
+                "w-full transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all",
+                size === 'default' 
+                  ? "max-w-2xl" // tickets: smaller width, auto height
+                  : "max-w-3xl h-[90vh]" // KB: larger width, fixed height
+              )}>
                 <HeadlessDialog.Title
                   as="div"
                   className="flex items-center justify-between border-b pb-4 mb-4"
@@ -55,7 +62,12 @@ export function Dialog({ isOpen, onClose, title, children }: DialogProps) {
                     <XMarkIcon className="h-6 w-6" aria-hidden="true" />
                   </button>
                 </HeadlessDialog.Title>
-                <div className="overflow-y-auto h-[calc(90vh-120px)]">
+                <div className={cn(
+                  "overflow-y-auto",
+                  size === 'default' 
+                    ? "" // tickets: no fixed height
+                    : "h-[calc(90vh-120px)]" // KB: fixed height minus header
+                )}>
                   {children}
                 </div>
               </HeadlessDialog.Panel>
