@@ -1,16 +1,18 @@
-// @ts-nocheck
 // RAG (Retrieval Augmented Generation) functionality
 // This will be implemented when needed by the agent
 
-import { createClient } from '../supabase'
+import { createServerClient } from '../supabase-server'
 import { generateEmbedding } from './embeddings'
 import { RagResult } from './types'
 import { Database } from '../../types/database'
 import { BaseService } from '../../services/base'
 
-type Ticket = Database['public']['Tables']['tickets']['Row']
-type TicketActivity = Database['public']['Tables']['ticket_activities']['Row']
-type User = Database['public']['Tables']['users']['Row']
+type Tables = Database['public']['Tables']
+type TicketRow = Tables['tickets']['Row']
+type TicketActivityRow = Tables['ticket_activities']['Row']
+type UserRow = Tables['users']['Row']
+
+type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[]
 
 interface RAGQuery {
   ticketNumber?: number
@@ -20,8 +22,8 @@ interface RAGQuery {
 }
 
 // Types for our RAG system
-interface RPCTicketResult {
-  id: number;
+interface DevectorizedTicketResult {
+  id: string;
   number: number;
   subject: string;
   description: string;
@@ -30,39 +32,51 @@ interface RPCTicketResult {
   created_at: string;
   updated_at: string;
   resolved_at: string | null;
-  metadata: any;
+  metadata: JsonValue;
   client: {
-    id: number;
+    id: string;
     email: string;
     full_name: string;
   } | null;
   agent: {
-    id: number;
+    id: string;
     email: string;
     full_name: string;
   } | null;
+  activities: Array<{
+    id: string;
+    content: string;
+    activity_type: string;
+    created_at: string;
+    is_internal: boolean;
+    user: {
+      id: string;
+      email: string;
+      full_name: string;
+    };
+  }>;
   similarity: number;
 }
 
-interface TicketWithRelations extends Ticket {
-  client: User | null
-  agent: User | null
-  similarity: number
-}
-
 interface KBSearchResult {
-  id: string
-  similarity: number
-}
-
-interface MatchTicketsResult {
-  id: number
-  similarity: number
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  subcategory?: string | null;
+  created_at: string;
+  updated_at: string;
+  is_published: boolean;
+  metadata: JsonValue;
+  similarity: number;
 }
 
 class RAGService extends BaseService {
+  protected supabase = createServerClient()  // Use server client with service role
+
   // Helper to get ticket by number
   private async getTicketByNumber(ticketNumber: number) {
+    console.log(`[RAG] Fetching ticket #${ticketNumber}`);
     const { data, error } = await this.supabase
       .from('tickets')
       .select(`
@@ -77,76 +91,175 @@ class RAGService extends BaseService {
       .eq('number', ticketNumber)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error(`[RAG] Error fetching ticket #${ticketNumber}:`, error);
+      throw error;
+    }
+    console.log(`[RAG] Found ticket:`, data);
     return data;
   }
 
-  // Helper to perform vector search on tickets
-  private async searchTickets(embedding: string, limit: number): Promise<TicketWithRelations[]> {
-    const { data, error } = await this.supabase
+  // Helper to perform vector search on tickets using devectorized function
+  private async searchTickets(embedding: number[], limit: number): Promise<DevectorizedTicketResult[]> {
+    console.log(`[RAG] Searching tickets with embedding of length ${embedding.length}, limit ${limit}`);
+    
+    // First check if we have any embeddings at all
+    const { count, error: countError } = await this.supabase
+      .from('ticket_embeddings')
+      .select('id', { count: 'exact' })
+    
+    console.log(`[RAG] Found ${count || 0} total ticket embeddings in database`);
+    
+    if (countError) {
+      console.error('[RAG] Error checking ticket embeddings:', countError);
+      throw countError;
+    }
+
+    // Get matches from match_tickets function
+    const { data: matches, error } = await this.supabase
       .rpc('match_tickets', {
-        query_embedding: embedding,
-        match_threshold: 0.7,
+        query_embedding: embedding as unknown as any,
+        match_threshold: 0.5,
         match_count: limit
-      }) as { data: MatchTicketsResult[] | null, error: any };
+      }) as { data: { id: number; similarity: number }[] | null, error: any };
 
-    if (error) throw error;
+    if (error) {
+      console.error('[RAG] Error searching tickets:', error);
+      throw error;
+    }
 
-    // Get full ticket data for the matched IDs
-    if (!data?.length) return [];
+    if (!matches?.length) {
+      console.log('[RAG] No matches found');
+      return [];
+    }
 
-    const matchedIds = data.map(d => d.id.toString());
+    // Fetch full ticket details including activities for the matched tickets
     const { data: tickets, error: ticketsError } = await this.supabase
       .from('tickets')
       .select(`
         *,
-        client:client_id(
+        client:client_id(id, email, full_name),
+        agent:agent_id(id, email, full_name),
+        activities:ticket_activities(
           id,
-          email,
-          full_name,
-          role,
+          content,
+          activity_type,
           created_at,
-          updated_at,
-          last_seen,
-          metadata
-        ),
-        agent:agent_id(
-          id,
-          email,
-          full_name,
-          role,
-          created_at,
-          updated_at,
-          last_seen,
-          metadata
+          is_internal,
+          user:users(id, email, full_name)
         )
       `)
-      .in('id', matchedIds);
+      .in('id', matches.map(m => m.id.toString())) as { 
+        data: (TicketRow & {
+          client: Pick<UserRow, 'id' | 'email' | 'full_name'> | null;
+          agent: Pick<UserRow, 'id' | 'email' | 'full_name'> | null;
+          activities: Array<TicketActivityRow & {
+            user: Pick<UserRow, 'id' | 'email' | 'full_name'>;
+          }>;
+        })[] | null;
+        error: any;
+      };
 
-    if (ticketsError) throw ticketsError;
+    if (ticketsError) {
+      console.error('[RAG] Error fetching ticket details:', ticketsError);
+      throw ticketsError;
+    }
 
-    // Add similarity scores to tickets
-    return (tickets || []).map(ticket => {
-      const matchData = data.find(d => d.id.toString() === ticket.id);
+    if (!tickets) {
+      return [];
+    }
+
+    // Merge the similarity scores with the full ticket details and ensure required fields
+    const results = tickets.map(ticket => {
+      const match = matches.find(m => m.id.toString() === ticket.id);
       return {
-        ...ticket,
-        similarity: matchData?.similarity || 0
-      } as TicketWithRelations;
+        id: ticket.id,
+        number: ticket.number,
+        subject: ticket.subject,
+        description: ticket.description,
+        status: ticket.status || 'new',  // Ensure status is never null
+        priority: ticket.priority || 'medium',  // Ensure priority is never null
+        created_at: ticket.created_at,
+        updated_at: ticket.updated_at,
+        resolved_at: ticket.resolved_at,
+        metadata: ticket.metadata || {},
+        client: ticket.client ? {
+          id: ticket.client.id,
+          email: ticket.client.email,
+          full_name: ticket.client.full_name
+        } : null,
+        agent: ticket.agent ? {
+          id: ticket.agent.id,
+          email: ticket.agent.email,
+          full_name: ticket.agent.full_name
+        } : null,
+        activities: (ticket.activities || []).map(activity => ({
+          id: activity.id,
+          content: activity.content || '',
+          activity_type: activity.activity_type,
+          created_at: activity.created_at,
+          is_internal: activity.is_internal || false,
+          user: {
+            id: activity.user.id,
+            email: activity.user.email,
+            full_name: activity.user.full_name
+          }
+        })),
+        similarity: match?.similarity || 0
+      } as DevectorizedTicketResult;
     });
+
+    console.log(`[RAG] Found ${results.length} matching tickets with similarity >= 0`);
+    if (results.length) {
+      console.log('[RAG] Top ticket matches:', results.map(t => ({
+        number: t.number,
+        subject: t.subject,
+        similarity: t.similarity,
+        id: t.id,
+        activities_count: t.activities?.length || 0
+      })));
+    }
+
+    return results;
   }
 
   // Helper to perform vector search on KB articles
-  private async searchKBArticles(embedding: string, limit: number): Promise<KBSearchResult[]> {
+  private async searchKBArticles(embedding: number[], limit: number): Promise<KBSearchResult[]> {
+    console.log(`[RAG] Searching KB articles with embedding of length ${embedding.length}, limit ${limit}`);
+    // TODO: Implement devectorized KB article search similar to tickets
     const { data, error } = await this.supabase
       .from('knowledge_base_article_embeddings')
-      .select('id, embedding')
+      .select(`
+        id,
+        article:id(
+          id,
+          title,
+          content,
+          category,
+          subcategory,
+          created_at,
+          updated_at,
+          is_published,
+          metadata
+        )
+      `)
       .limit(limit);
 
-    if (error) throw error;
+    if (error) {
+      console.error('[RAG] Error searching KB articles:', error);
+      throw error;
+    }
+    console.log(`[RAG] Found ${data?.length || 0} KB articles`);
+    if (data?.length) {
+      console.log('[RAG] KB article matches:', data.map(d => ({
+        title: d.article.title,
+        category: d.article.category
+      })));
+    }
     return (data || []).map(d => ({
-      id: d.id,
-      similarity: 0.8
-    }));
+      ...d.article,
+      similarity: 0.8 // TODO: Implement proper similarity calculation
+    })) as KBSearchResult[];
   }
 
   // Main RAG function
@@ -156,6 +269,13 @@ class RAGService extends BaseService {
     searchTypes = ['tickets', 'kb'],
     limit = 5
   }: RAGQuery): Promise<RagResult> {
+    console.log('[RAG] Starting search with params:', {
+      ticketNumber,
+      searchQuery,
+      searchTypes,
+      limit
+    });
+
     try {
       const result: RagResult = {
         similarTickets: [],
@@ -165,45 +285,49 @@ class RAGService extends BaseService {
 
       let baseTicket = null;
       if (ticketNumber) {
+        console.log(`[RAG] Including context from ticket #${ticketNumber}`);
         baseTicket = await this.getTicketByNumber(ticketNumber);
         searchQuery = `${searchQuery} ${baseTicket.subject} ${baseTicket.description}`;
+        console.log('[RAG] Enhanced search query:', searchQuery);
       }
 
+      console.log('[RAG] Generating embedding for query...');
       const embedding = await generateEmbedding(searchQuery);
+      console.log(`[RAG] Generated embedding of length ${embedding.length}`);
+
       const searchPromises: Promise<void>[] = [];
 
       if (searchTypes.includes('tickets')) {
+        console.log('[RAG] Adding ticket search to queue');
         searchPromises.push(
           this.searchTickets(embedding, limit)
             .then(tickets => {
               result.similarTickets = tickets;
+              console.log(`[RAG] Completed ticket search, found ${tickets.length} matches`);
             })
         );
       }
 
       if (searchTypes.includes('kb')) {
+        console.log('[RAG] Adding KB article search to queue');
         searchPromises.push(
           this.searchKBArticles(embedding, limit)
-            .then(async (results) => {
-              const validIds = results.map(r => r.id);
-              
-              if (validIds.length > 0) {
-                const { data: articles } = await this.supabase
-                  .from('knowledge_base_articles')
-                  .select('*')
-                  .in('id', validIds);
-
-                result.knowledgeBase = articles || [];
-              }
+            .then(articles => {
+              result.knowledgeBase = articles;
+              console.log(`[RAG] Completed KB search, found ${articles.length} matches`);
             })
         );
       }
 
       await Promise.all(searchPromises);
+      console.log('[RAG] Search completed. Final results:', {
+        similarTicketsCount: result.similarTickets.length,
+        knowledgeBaseCount: result.knowledgeBase.length
+      });
       return result;
 
     } catch (error) {
-      console.error('Error in RAG search:', error);
+      console.error('[RAG] Error in RAG search:', error);
       throw error;
     }
   }
@@ -215,4 +339,4 @@ export const ragService = new RAGService()
 // Export the main function for convenience
 export const performRAGSearch = (query: RAGQuery) => ragService.performSearch(query)
 
-export {}  // Placeholder to make TypeScript happy 
+export type { DevectorizedTicketResult, KBSearchResult }  // Export types for use in other files 

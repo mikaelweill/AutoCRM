@@ -131,123 +131,119 @@ This simplified schema leverages LangSmith's capabilities for detailed action tr
 
 ## AI Assistant Flow
 
-### 1. Message Classification
-The AI first classifies incoming messages into types:
-- **Pure Chat**: General conversation, greetings, etc.
-- **Information Request**: Requires RAG to find relevant information
-- **Action Request**: Requires performing actions on tickets/system
-- **Complex Request**: Combination of information gathering and actions
+### 1. Graph-Based Processing
+The system uses a directed graph structure for message processing:
 
-### 2. Processing Flow
 ```
-User Message
+Input Node
     │
-    ├── Router/Classifier
-    │   ├── Pure Chat → Direct Response
-    │   │
-    │   ├── Information Request
-    │   │   ├── RAG Search
-    │   │   │   ├── KB Articles
-    │   │   │   ├── Past Tickets
-    │   │   │   └── Documentation
-    │   │   └── Format Response
-    │   │
-    │   ├── Action Request
-    │   │   ├── Parse Action
-    │   │   ├── Validate Requirements
-    │   │   ├── Execute Action
-    │   │   └── Confirm Completion
-    │   │
-    │   └── Complex Request
-    │       ├── Break Down Steps
-    │       ├── Execute Each Step
-    │       └── Aggregate Results
-    │
-    └── Response Generation
-        ├── Include Sources (if RAG)
-        ├── Action Results (if any)
-        └── Next Steps/Suggestions
+    ├─→ Decision Node
+    │       │
+    │       ├─→ Direct Response Node ─→ END
+    │       │
+    │       ├─→ Ticket Action Node ─→ Response Node ─→ END
+    │       │
+    │       └─→ RAG Node ─→ Decision Node
+    │               │            │
+    │               │            ├─→ Response Node ─→ END
+    │               │            │
+    │               │            └─→ Ticket Action Node ─→ Response Node ─→ END
+    │               │
+    │               └─→ Response Node ─→ END
 ```
 
-### 3. Available Tools
-1. **RAG Tools**
-   - KB Article Search
-   - Similar Ticket Search
-   - Documentation Search
+### 2. Node Types
 
-2. **Ticket Tools**
-   - Update Status
-   - Add Comment
-   - Assign/Unassign
-   - Change Priority
+1. **Input Node**
+   - Receives user message
+   - Performs initial message parsing
+   - Routes to Decision Node
 
-3. **Utility Tools**
-   - Format Response
-   - Validate Input
-   - Check Permissions
+2. **Decision Node**
+   - Classifies request type:
+     * Pure conversation (direct response)
+     * Ticket action needed
+     * Information lookup needed (RAG)
+   - Routes to appropriate node based on classification
 
-### 4. Implementation Steps
-1. **Phase 1: Basic Router**
-   - Set up LangChain agent
-   - Implement basic message classification
-   - Handle pure chat responses
+3. **RAG Node**
+   - Performs vector search
+   - Retrieves relevant documents
+   - Formats search results
+   - Can route to:
+     * Response Node (if information is sufficient)
+     * Ticket Action Node (if action needed based on information)
 
-2. **Phase 2: RAG Integration**
-   - Connect existing embedding system
-   - Implement search tools
-   - Add source tracking
+4. **Ticket Action Node**
+   - Performs ticket operations:
+     * Update status
+     * Add comments
+     * Change priority
+     * Assign/unassign
+   - Always routes to Response Node
 
-3. **Phase 3: Action Tools**
-   - Define tool interfaces
-   - Implement ticket actions
-   - Add validation and error handling
+5. **Response Node**
+   - Formats final response
+   - Includes:
+     * Direct answers
+     * Search results (if from RAG)
+     * Action confirmations (if from Ticket Action)
+   - Terminates the flow
 
-4. **Phase 4: Complex Flows**
-   - Implement step breakdown
-   - Add progress tracking
-   - Handle multi-step operations
+### 3. Edge Conditions
 
-### 5. Example Flows
+1. **RAG → Decision**
+   - If search results indicate action needed
+   - If additional context required
 
-#### Pure Chat
-```
-User: "How are you doing?"
-→ Classified as Pure Chat
-→ Direct response using chat model
-Bot: "I'm doing well, thank you! How can I assist you today?"
-```
+2. **Decision → Response**
+   - If simple question/greeting
+   - If no action or search needed
 
-#### Information Request
-```
-User: "What's our policy on refunds?"
-→ Classified as Information Request
-→ RAG search KB articles
-→ Format response with sources
-Bot: "According to our policy [KB-123], refunds are processed within..."
-```
+3. **Decision → Ticket Action**
+   - If clear ticket action requested
+   - If permissions verified
 
-#### Action Request
-```
-User: "Please update ticket #1234 to high priority"
-→ Classified as Action Request
-→ Parse ticket number and action
-→ Validate permissions
-→ Execute action
-→ Confirm completion
-Bot: "I've updated ticket #1234 to high priority. The change has been logged."
-```
+4. **Decision → RAG**
+   - If information lookup needed
+   - If context required for action
 
-#### Complex Request
-```
-User: "Find similar cases to ticket #1234 and update it with the best solution"
-→ Classified as Complex Request
-→ Break down steps:
-  1. Search similar tickets
-  2. Analyze solutions
-  3. Update ticket
-→ Execute each step
-→ Provide comprehensive response
-Bot: "I've found 3 similar cases. Based on the successful resolution in case #789..."
+### 4. Implementation Details
+
+```typescript
+interface Node {
+  process: (input: any) => Promise<NodeResult>
+  getNextNode: (result: NodeResult) => Node | null
+}
+
+interface NodeResult {
+  output: any
+  metadata: {
+    requiresAction?: boolean
+    requiresSearch?: boolean
+    confidence: number
+  }
+}
+
+class DecisionNode implements Node {
+  async process(input: string): Promise<NodeResult> {
+    // Classify input and determine next step
+    return {
+      output: classificationResult,
+      metadata: {
+        requiresAction: boolean,
+        requiresSearch: boolean,
+        confidence: number
+      }
+    }
+  }
+
+  getNextNode(result: NodeResult): Node {
+    if (result.metadata.requiresSearch) return new RAGNode()
+    if (result.metadata.requiresAction) return new TicketActionNode()
+    return new ResponseNode()
+  }
+}
 ```
 
 ## Implementation Plan

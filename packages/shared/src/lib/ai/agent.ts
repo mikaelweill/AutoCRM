@@ -6,6 +6,8 @@ import { MessageType, MessageClassification, AgentResponse } from './types'
 import { LangChainTracer } from 'langchain/callbacks'
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base'
 import { v4 as uuidv4 } from 'uuid'
+import { performRAGSearch } from './rag'
+import { z } from 'zod'
 
 // Define our tool interfaces
 interface ToolResult {
@@ -27,20 +29,93 @@ class TicketTool extends Tool {
 
 class RAGTool extends Tool {
   name = 'search'
-  description = 'Search knowledge base, past tickets, and documentation. Input should be a search query string.'
+  description = `Search knowledge base and tickets. Provide your search query as a string.
+For simple search, just provide your query:
+  "how to handle password reset"
 
-  async _call(query: string): Promise<string> {
+For searching with a ticket number, use this format:
+  "ticket:123 find similar issues"
+
+The tool will return:
+- Similar tickets (with number, subject, description, status, priority)
+- Knowledge base articles (with title, content, category)
+- Similarity scores (0-1) indicating relevance`
+
+  schema = z.object({
+    input: z.string().optional().describe('Search query, optionally prefixed with ticket:NUMBER for ticket-based search')
+  }).transform((obj) => obj.input)
+
+  async _call(input: string): Promise<string> {
     try {
-      // For now, just return a structured response about no results
-      return JSON.stringify({
-        status: 'no_results',
-        message: 'I searched for tickets and documentation related to your query but found no exact matches. Please try rephrasing your search or provide more specific details about what you\'re looking for.'
-      })
+      // Parse input for ticket number if present
+      const ticketMatch = input.match(/^ticket:(\d+)\s+(.+)$/);
+      const searchParams = ticketMatch
+        ? {
+            searchQuery: ticketMatch[2],
+            ticketNumber: parseInt(ticketMatch[1])
+          }
+        : { searchQuery: input };
+
+      const results = await performRAGSearch(searchParams);
+      
+      // Format the results in a way that's useful for the agent
+      const response = {
+        status: 'success',
+        function_called: searchParams.ticketNumber ? 'search_with_ticket' : 'search_by_query',
+        parameters: searchParams,
+        similarTickets: results.similarTickets.map(ticket => ({
+          number: ticket.number,
+          subject: ticket.subject,
+          description: ticket.description,
+          status: ticket.status,
+          priority: ticket.priority,
+          similarity: ticket.similarity,
+          activities: ticket.activities?.map((activity: { 
+            content: string;
+            created_at: string;
+            activity_type: string;
+            is_internal: boolean;
+            user: {
+              email: string;
+              full_name: string;
+            }
+          }) => ({
+            content: activity.content,
+            created_at: activity.created_at,
+            activity_type: activity.activity_type,
+            is_internal: activity.is_internal,
+            user: {
+              email: activity.user.email,
+              full_name: activity.user.full_name
+            }
+          }))
+        })),
+        knowledgeBase: results.knowledgeBase.map(article => ({
+          title: article.title,
+          content: article.content,
+          category: article.category,
+          similarity: article.similarity
+        }))
+      };
+
+      // If no results found
+      if (response.similarTickets.length === 0 && response.knowledgeBase.length === 0) {
+        return JSON.stringify({
+          status: 'no_results',
+          function_called: response.function_called,
+          parameters: response.parameters,
+          message: searchParams.ticketNumber 
+            ? `No matches found for content similar to ticket #${searchParams.ticketNumber}. Try a different ticket or a more general search.`
+            : 'No matches found for your search. Try rephrasing or using different terms.'
+        });
+      }
+
+      return JSON.stringify(response);
     } catch (error) {
       console.error('Error in RAGTool:', error)
       return JSON.stringify({
         status: 'error',
-        message: 'I encountered an error while searching. Please try again or rephrase your query.'
+        message: 'Search failed. Please try again or rephrase your query.'
       })
     }
   }
@@ -71,17 +146,32 @@ export async function createAssistantAgent(tracer: LangChainTracer, runId?: stri
     // Create our prompt template
     console.log('Creating prompt template...')
     const prompt = ChatPromptTemplate.fromMessages([
-      ["system", `You are a helpful customer service AI assistant with access to two tools:
-      1. 'search' - Use this tool to search through knowledge base, past tickets, and documentation
-      2. 'ticket' - Use this tool for ticket operations like update and assign
+      ["system", `You are a helpful and friendly customer service AI assistant. Your goal is to have natural conversations while helping solve problems.
 
-      For any questions about tickets, customers, or documentation, ALWAYS use the appropriate tool.
-      For example:
-      - If asked about a specific ticket or customer, use the 'search' tool
-      - If asked to update or modify a ticket, use the 'ticket' tool
-      
-      Format your responses professionally and clearly.
-      If a tool returns an error or no results, explain this to the user.`],
+Key guidelines:
+- ALWAYS use the 'search' tool when looking for ticket information
+- Be conversational and natural in your responses
+- Only mention information that is directly relevant to the user's question
+- Include relevant ticket comments/activities when discussing tickets
+- Don't dump lists of information unless specifically asked
+- Don't mention knowledge base articles unless they directly answer the user's question
+- Focus on having a dialogue rather than delivering a report
+
+When searching for tickets:
+1. First use the search tool with the user's query
+2. Review the results, including any comments/activities
+3. Respond naturally about what you found
+
+For example, instead of:
+"Here are the ticket details:
+- Number: 123
+- Status: Open
+- Priority: High"
+
+Say something like:
+"I found the ticket about the login issue you mentioned. The customer reported they couldn't access their account yesterday, and our support team responded with..."
+
+Remember: You're having a conversation, not writing a formal report.`],
       ["human", "{input}"],
       ["assistant", "{agent_scratchpad}"]
     ])
