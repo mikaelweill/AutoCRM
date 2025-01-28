@@ -57,8 +57,8 @@ export async function POST(req: Request) {
       )
     }
 
-    // Process message through AI
-    const aiResponse = await processMessage(content)
+    // Process message through AI with agent ID
+    const aiResponse = await processMessage(content, session.user.id)
 
     // Save AI response
     const { data: assistantMessage, error: aiInsertError } = await supabase

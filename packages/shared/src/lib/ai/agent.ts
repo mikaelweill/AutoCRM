@@ -8,6 +8,7 @@ import { BaseCallbackHandler } from '@langchain/core/callbacks/base'
 import { v4 as uuidv4 } from 'uuid'
 import { performRAGSearch } from './rag'
 import { z } from 'zod'
+import { ticketActionService, TicketStatus, TicketPriority } from './ticket_action'
 
 // Define our tool interfaces
 interface ToolResult {
@@ -16,14 +17,161 @@ interface ToolResult {
   error?: string
 }
 
+// Define activity type
+interface TicketActivity {
+  content: string
+  created_at: string
+  activity_type: string
+  is_internal: boolean
+  user: {
+    email: string
+    full_name: string
+  }
+}
+
 // Define our tools
 class TicketTool extends Tool {
   name = 'ticket'
-  description = 'Manage ticket operations like update, assign, etc.'
+  private agentId: string
 
-  async _call(arg: string): Promise<string> {
-    // Implementation coming soon
-    return 'Ticket operation completed'
+  constructor(agentId: string) {
+    super()
+    this.agentId = agentId
+  }
+
+  description = `Manage ticket operations. Commands should be in natural language.
+Examples:
+- "assign ticket #123 to me"
+- "mark ticket #456 as resolved"
+- "set priority of ticket #789 to high"
+- "add comment to ticket #234: Customer issue has been fixed"
+- "add internal note to ticket #567: Following up with engineering"
+- "unassign ticket #890"
+
+The tool will handle:
+- Ticket assignment (self only)
+- Status updates (new, in_progress, resolved, closed, cancelled)
+- Priority updates (low, medium, high, urgent)
+- Adding comments (public or internal)
+- Unassigning tickets`
+
+  schema = z.object({
+    input: z.string().optional().describe('Natural language command')
+  }).transform(obj => obj.input)
+
+  async _call(input: string): Promise<string> {
+    try {
+      // Use the command directly, no need to parse JSON anymore
+      const command = input
+      const currentAgentId = this.agentId
+
+      // Extract ticket number from command
+      const ticketMatch = command.match(/#(\d+)/)
+      if (!ticketMatch) {
+        return JSON.stringify({
+          success: false,
+          error: 'No ticket number found in command. Please specify a ticket number (e.g., #123)'
+        })
+      }
+      const ticketNumber = parseInt(ticketMatch[1])
+
+      // Validate ticket exists
+      const ticketExists = await ticketActionService.validateTicket(ticketNumber)
+      if (!ticketExists) {
+        return JSON.stringify({
+          success: false,
+          error: `Ticket #${ticketNumber} not found`
+        })
+      }
+
+      // Handle different command types
+      if (command.match(/assign.*to me/i)) {
+        const result = await ticketActionService.assignToMe(ticketNumber, currentAgentId)
+        return JSON.stringify(result)
+      }
+
+      if (command.match(/unassign/i)) {
+        const result = await ticketActionService.unassignTicket(ticketNumber, currentAgentId)
+        return JSON.stringify(result)
+      }
+
+      if (command.match(/mark.*as|set.*status|change.*status/i)) {
+        const statusMatch = command.match(/as\s+(\w+)|status\s+(?:to\s+)?(\w+)/i)
+        if (!statusMatch) {
+          return JSON.stringify({
+            success: false,
+            error: 'No status specified. Valid statuses are: new, in_progress, resolved, closed, cancelled'
+          })
+        }
+        const status = (statusMatch[1] || statusMatch[2]).toLowerCase()
+        if (!['new', 'in_progress', 'resolved', 'closed', 'cancelled'].includes(status)) {
+          return JSON.stringify({
+            success: false,
+            error: 'Invalid status. Valid statuses are: new, in_progress, resolved, closed, cancelled'
+          })
+        }
+        const result = await ticketActionService.updateStatus(
+          ticketNumber,
+          status as TicketStatus,
+          currentAgentId
+        )
+        return JSON.stringify(result)
+      }
+
+      if (command.match(/priority/i)) {
+        const priorityMatch = command.match(/priority\s+(?:to\s+)?(\w+)/i)
+        if (!priorityMatch) {
+          return JSON.stringify({
+            success: false,
+            error: 'No priority specified. Valid priorities are: low, medium, high, urgent'
+          })
+        }
+        const priority = priorityMatch[1].toLowerCase()
+        if (!['low', 'medium', 'high', 'urgent'].includes(priority)) {
+          return JSON.stringify({
+            success: false,
+            error: 'Invalid priority. Valid priorities are: low, medium, high, urgent'
+          })
+        }
+        const result = await ticketActionService.updatePriority(
+          ticketNumber,
+          priority as TicketPriority,
+          currentAgentId
+        )
+        return JSON.stringify(result)
+      }
+
+      if (command.match(/add.*(?:internal note|comment)/i)) {
+        const isInternal = command.includes('internal')
+        const contentMatch = command.match(/:\s*(.+)$/)
+        if (!contentMatch) {
+          return JSON.stringify({
+            success: false,
+            error: 'No comment content provided. Format should be: "add comment to ticket #123: Your comment here"'
+          })
+        }
+        const content = contentMatch[1].trim()
+        const result = await ticketActionService.addComment(
+          ticketNumber,
+          content,
+          currentAgentId,
+          isInternal
+        )
+        return JSON.stringify(result)
+      }
+
+      return JSON.stringify({
+        success: false,
+        error: 'Unrecognized command. Please check the tool description for supported commands.'
+      })
+
+    } catch (error) {
+      console.error('Error in TicketTool:', error)
+      return JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : 'An unknown error occurred'
+      })
+    }
   }
 }
 
@@ -122,7 +270,11 @@ The tool will return:
 }
 
 // Create and export our agent setup function
-export async function createAssistantAgent(tracer: LangChainTracer, runId?: string) {
+export async function createAssistantAgent(
+  tracer: LangChainTracer,
+  agentId: string,
+  runId?: string
+) {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY is not configured')
   }
@@ -136,10 +288,10 @@ export async function createAssistantAgent(tracer: LangChainTracer, runId?: stri
       openAIApiKey: process.env.OPENAI_API_KEY
     })
 
-    // Setup our toolkit
+    // Setup our toolkit with agentId
     console.log('Setting up toolkit...')
     const toolkit = [
-      new TicketTool(),
+      new TicketTool(agentId),
       new RAGTool(),
     ]
 
@@ -236,7 +388,7 @@ class RunIDHandler extends BaseCallbackHandler {
 }
 
 // Helper function to process messages
-export async function processMessage(content: string): Promise<AgentResponse> {
+export async function processMessage(content: string, agentId: string): Promise<AgentResponse> {
   try {
     console.log('Creating assistant agent...')
     const runId = uuidv4()
@@ -246,7 +398,7 @@ export async function processMessage(content: string): Promise<AgentResponse> {
       projectName: process.env.LANGCHAIN_PROJECT || "autocrm"
     })
 
-    const agent = await createAssistantAgent(tracer, runId)
+    const agent = await createAssistantAgent(tracer, agentId, runId)
     
     console.log('Invoking agent with content:', content)
     const result = await agent.invoke({ 
