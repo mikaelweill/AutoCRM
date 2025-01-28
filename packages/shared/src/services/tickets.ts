@@ -473,17 +473,17 @@ export async function addTicketReply(ticketId: string, content: string): Promise
   console.log('User role check:', { userData, userRoleError })
 
   if (!userRoleError && (userData?.role === 'admin' || userData?.role === 'agent')) {
+
+    console.log('ticketId', ticketId)
     // Check if ticket was created from email
     const { data: emailData } = await supabase
       .from('ticket_emails')
       .select('id')
       .eq('ticket_id', ticketId)
-      .limit(1)
-      .single()
 
     console.log('Email data check:', { emailData })
 
-    if (emailData) {
+    if (Array.isArray(emailData) && emailData.length > 0) {  // Ensure emailData is an array and has items
       // This ticket has email history, send the comment as an email
       try {
         const { data: { session } } = await supabase.auth.getSession()
