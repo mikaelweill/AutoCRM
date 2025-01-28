@@ -119,9 +119,9 @@ class RAGService extends BaseService {
     const { data: matches, error } = await this.supabase
       .rpc('match_tickets', {
         query_embedding: embedding as unknown as any,
-        match_threshold: 0.5,
+        match_threshold: 0,
         match_count: limit
-      }) as { data: { id: number; similarity: number }[] | null, error: any };
+      }) as { data: DevectorizedTicketResult[] | null, error: any };
 
     if (error) {
       console.error('[RAG] Error searching tickets:', error);
@@ -133,13 +133,11 @@ class RAGService extends BaseService {
       return [];
     }
 
-    // Fetch full ticket details including activities for the matched tickets
-    const { data: tickets, error: ticketsError } = await this.supabase
+    // Fetch activities for the matched tickets
+    const { data: ticketsWithActivities, error: activitiesError } = await this.supabase
       .from('tickets')
       .select(`
-        *,
-        client:client_id(id, email, full_name),
-        agent:agent_id(id, email, full_name),
+        id,
         activities:ticket_activities(
           id,
           content,
@@ -149,51 +147,19 @@ class RAGService extends BaseService {
           user:users(id, email, full_name)
         )
       `)
-      .in('id', matches.map(m => m.id.toString())) as { 
-        data: (TicketRow & {
-          client: Pick<UserRow, 'id' | 'email' | 'full_name'> | null;
-          agent: Pick<UserRow, 'id' | 'email' | 'full_name'> | null;
-          activities: Array<TicketActivityRow & {
-            user: Pick<UserRow, 'id' | 'email' | 'full_name'>;
-          }>;
-        })[] | null;
-        error: any;
-      };
+      .in('id', matches.map(m => m.id));
 
-    if (ticketsError) {
-      console.error('[RAG] Error fetching ticket details:', ticketsError);
-      throw ticketsError;
+    if (activitiesError) {
+      console.error('[RAG] Error fetching activities:', activitiesError);
+      throw activitiesError;
     }
 
-    if (!tickets) {
-      return [];
-    }
-
-    // Merge the similarity scores with the full ticket details and ensure required fields
-    const results = tickets.map(ticket => {
-      const match = matches.find(m => m.id.toString() === ticket.id);
+    // Merge activities with the matched tickets
+    const results = matches.map(ticket => {
+      const ticketActivities = ticketsWithActivities?.find(t => t.id === ticket.id)?.activities || [];
       return {
-        id: ticket.id,
-        number: ticket.number,
-        subject: ticket.subject,
-        description: ticket.description,
-        status: ticket.status || 'new',  // Ensure status is never null
-        priority: ticket.priority || 'medium',  // Ensure priority is never null
-        created_at: ticket.created_at,
-        updated_at: ticket.updated_at,
-        resolved_at: ticket.resolved_at,
-        metadata: ticket.metadata || {},
-        client: ticket.client ? {
-          id: ticket.client.id,
-          email: ticket.client.email,
-          full_name: ticket.client.full_name
-        } : null,
-        agent: ticket.agent ? {
-          id: ticket.agent.id,
-          email: ticket.agent.email,
-          full_name: ticket.agent.full_name
-        } : null,
-        activities: (ticket.activities || []).map(activity => ({
+        ...ticket,
+        activities: ticketActivities.map(activity => ({
           id: activity.id,
           content: activity.content || '',
           activity_type: activity.activity_type,
@@ -204,8 +170,7 @@ class RAGService extends BaseService {
             email: activity.user.email,
             full_name: activity.user.full_name
           }
-        })),
-        similarity: match?.similarity || 0
+        }))
       } as DevectorizedTicketResult;
     });
 
@@ -229,8 +194,7 @@ class RAGService extends BaseService {
     // TODO: Implement devectorized KB article search similar to tickets
     const { data, error } = await this.supabase
       .from('knowledge_base_article_embeddings')
-      .select(`
-        id,
+      .select(`        id,
         article:id(
           id,
           title,
