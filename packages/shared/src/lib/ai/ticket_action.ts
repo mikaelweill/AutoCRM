@@ -28,6 +28,43 @@ interface ActionLog {
 export class TicketActionService {
   private supabase = createServerClient()
 
+  // Add getTicketContent method
+  async getTicketContent(ticketNumber: number): Promise<{
+    id: string;
+    number: number;
+    subject: string;
+    description: string;
+    currentStatus: TicketStatus;
+    currentAgentId: string | null;
+    client: { id: string; email: string; full_name: string | null } | null;
+  } | null> {
+    const { data, error } = await this.supabase
+      .from('tickets')
+      .select(`
+        id,
+        number,
+        subject,
+        description,
+        status,
+        agent_id,
+        client:users!client_id(id, email, full_name)
+      `)
+      .eq('number', ticketNumber)
+      .single()
+
+    if (error || !data) return null
+
+    return {
+      id: data.id,
+      number: data.number,
+      subject: data.subject,
+      description: data.description,
+      currentStatus: data.status as TicketStatus,
+      currentAgentId: data.agent_id,
+      client: data.client
+    }
+  }
+
   // Status transition validation
   private readonly validTransitions: Record<TicketStatus, TicketStatus[]> = {
     'new': ['in_progress', 'cancelled'],

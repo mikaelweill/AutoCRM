@@ -149,8 +149,7 @@ class RAGService extends BaseService {
     // Fetch activities for the matched tickets
     const { data: ticketsWithActivities, error: activitiesError } = await this.supabase
       .from('tickets')
-      .select(`
-        id,
+      .select(`        id,
         activities:ticket_activities(
           id,
           content,
@@ -324,4 +323,5 @@ export const ragService = new RAGService()
 // Export the main function for convenience
 export const performRAGSearch = (query: RAGQuery) => ragService.performSearch(query)
 
-export type { DevectorizedTicketResult, KBSearchResult }  // Export types for use in other files 
+export type { DevectorizedTicketResult, KBSearchResult, RAGQuery }  // Export types for use in other files
+
