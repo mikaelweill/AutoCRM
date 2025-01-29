@@ -1,7 +1,7 @@
 import { ChatOpenAI } from '@langchain/openai'
-import { AgentExecutor, createOpenAIToolsAgent } from 'langchain/agents'
+import { AgentExecutor, createOpenAIFunctionsAgent } from 'langchain/agents'
 import { Tool } from '@langchain/core/tools'
-import { ChatPromptTemplate } from '@langchain/core/prompts'
+import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts'
 import { MessageType, AgentResponse } from './types'
 import { LangChainTracer } from 'langchain/callbacks'
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base'
@@ -9,6 +9,8 @@ import { v4 as uuidv4 } from 'uuid'
 import { performRAGSearch } from './rag'
 import { z } from 'zod'
 import { ticketActionService, TicketStatus, TicketPriority } from './ticket_action'
+import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages'
+import { AgentStep } from '@langchain/core/agents'
 
 
 // Define our tools
@@ -350,6 +352,21 @@ The tool will return:
   }
 }
 
+// Add this type to help format the scratchpad
+interface FormattedStep {
+  action: string;
+  action_input: string;  // Keep as string since we'll stringify objects
+  observation: string;
+  thought?: string;
+}
+
+// Update AgentState interface
+interface AgentState {
+  chatHistory: ConversationMessage[];
+}
+
+const agentStates = new Map<string, AgentState>();
+
 // Create and export our agent setup function
 export async function createAssistantAgent(
   tracer: LangChainTracer,
@@ -364,7 +381,7 @@ export async function createAssistantAgent(
     // Initialize the LLM
     console.log('Initializing LLM...')
     const llm = new ChatOpenAI({
-      modelName: "gpt-4o-mini",
+      modelName: "gpt-4",
       temperature: 0,
       openAIApiKey: process.env.OPENAI_API_KEY
     })
@@ -376,10 +393,9 @@ export async function createAssistantAgent(
       new RAGTool(),
     ]
 
-    // Create our prompt template
-    console.log('Creating prompt template...')
-    const prompt = ChatPromptTemplate.fromMessages([
-      ["system", `You are a helpful and friendly customer service AI assistant. Your goal is to have natural conversations while helping solve problems.
+    // Create the system prompt
+    const systemMessage = new SystemMessage({
+      content: `You are a helpful and friendly customer service AI assistant. Your goal is to have natural conversations while helping solve problems.
 
 Key guidelines:
 - Be conversational and natural in your responses
@@ -395,45 +411,23 @@ You MUST use the 'search' tool for:
 - Policy/procedure questions
 - Product information
 
-You MAY use the 'search' tool for:
-- Ticket editing operations (use your judgment)
-- Direct system commands
-- Clarification questions
+Remember: You're having a conversation, not writing a formal report.`
+    })
 
-Do NOT use the 'search' tool for:
-- Basic greetings
-- Simple confirmations
-- Syntax questions
-- Direct commands
-- Questions about current conversation
-
-When using search results:
-- Never dump raw search results
-- Synthesize information into natural, conversational responses
-- If results are unclear or unhelpful, acknowledge this directly
-- Only include relevant information that answers the user's question
-- If multiple sources found, combine them coherently
-
-For example, instead of:
-"Here are the ticket details:
-- Number: 123
-- Status: Open
-- Priority: High"
-
-Say something like:
-"I found the ticket about the login issue you mentioned. The customer reported they couldn't access their account yesterday, and our support team responded with..."
-
-Remember: You're having a conversation, not writing a formal report.`],
-      ["human", "{input}"],
-      ["assistant", "{agent_scratchpad}"]
+    // Create the prompt with proper message history handling
+    const prompt = ChatPromptTemplate.fromMessages([
+      systemMessage,
+      new MessagesPlaceholder("chat_history"),
+      new MessagesPlaceholder("agent_scratchpad"),
+      ["human", "{input}"]
     ])
 
-    // Create the agent
+    // Create the agent using OpenAIFunctionsAgent
     console.log('Creating agent...')
-    const agent = await createOpenAIToolsAgent({
+    const agent = await createOpenAIFunctionsAgent({
       llm,
       tools: toolkit,
-      prompt,
+      prompt
     })
 
     // Create and return the executor
@@ -442,7 +436,11 @@ Remember: You're having a conversation, not writing a formal report.`],
       agent,
       tools: toolkit,
       callbacks: [tracer],
-      tags: runId ? ["autocrm", runId] : ["autocrm"]
+      tags: runId ? ["autocrm", runId] : ["autocrm"],
+      maxIterations: 3,
+      returnIntermediateSteps: true,
+      handleParsingErrors: true,
+      earlyStoppingMethod: "force"
     })
   } catch (error) {
     console.error('Error creating assistant agent:', error)
@@ -468,7 +466,13 @@ class RunIDHandler extends BaseCallbackHandler {
   }
 }
 
-// Helper function to process messages
+// Add this type to help with conversation history
+interface ConversationMessage {
+  role: 'human' | 'assistant'
+  content: string
+}
+
+// Modify the processMessage function to use proper message history
 export async function processMessage(content: string, agentId: string): Promise<AgentResponse> {
   try {
     console.log('Creating assistant agent...')
@@ -479,23 +483,51 @@ export async function processMessage(content: string, agentId: string): Promise<
       projectName: process.env.LANGCHAIN_PROJECT || "autocrm"
     })
 
+    // Get or initialize conversation history
+    if (!agentStates.has(agentId)) {
+      agentStates.set(agentId, {
+        chatHistory: []
+      });
+    }
+    const agentState = agentStates.get(agentId)!;
+
     const agent = await createAssistantAgent(tracer, agentId, runId)
     
     console.log('Invoking agent with content:', content)
+    
+    // Convert conversation history to LangChain messages
+    const chatHistory = agentState.chatHistory.map(msg => 
+      msg.role === 'human' 
+        ? new HumanMessage(msg.content)
+        : new AIMessage(msg.content)
+    );
+
+    // Execute agent with chat history
     const result = await agent.invoke({ 
       input: content,
-      callbacks: [tracer],
-      tags: ["autocrm", runId]
+      chat_history: chatHistory
     })
+
+    // Update conversation history
+    agentState.chatHistory.push(
+      { role: 'human', content },
+      { role: 'assistant', content: result.output || '' }
+    );
+
+    // Keep only last 20 messages
+    if (agentState.chatHistory.length > 20) {
+      agentState.chatHistory = agentState.chatHistory.slice(-20);
+    }
+
+    // Log the complete interaction
     console.log('Agent result:', result)
     console.log('Run ID:', runId)
 
-    // Transform the result into our AgentResponse type
     return {
-      content: result.output,
+      content: result.output || result.returnValues?.output || '',
       type: determineMessageType(result),
-      sources: [],  // We'll add these later
-      actions: [],  // We'll add these later
+      sources: [],
+      actions: [],
       trace_id: runId
     }
   } catch (error) {
@@ -519,6 +551,27 @@ export async function processMessage(content: string, agentId: string): Promise<
 
 // Helper to determine message type from result
 function determineMessageType(result: any): MessageType {
-  // Implementation coming soon
-  return 'chat'
+  if (!result || !result.output) return 'chat';
+  
+  // Check if the response indicates an error
+  if (result.error) return 'complex';
+  
+  // Check if this is a RAG response (contains search results)
+  if (result.intermediateSteps?.some((step: AgentStep) => 
+    step.action.tool === 'search' && 
+    JSON.parse(step.observation).status === 'success'
+  )) {
+    return 'information';
+  }
+  
+  // Check if this is a ticket action
+  if (result.intermediateSteps?.some((step: AgentStep) => 
+    step.action.tool === 'ticket' && 
+    JSON.parse(step.observation).success
+  )) {
+    return 'action';
+  }
+  
+  // Default to chat for regular responses
+  return 'chat';
 } 
