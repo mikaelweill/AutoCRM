@@ -57,35 +57,38 @@ export async function POST(req: Request) {
       )
     }
 
-    // Process message through AI with agent ID
-    const aiResponse = await processMessage(content, session.user.id)
+    // Only process messages from agents, not from the assistant
+    if (userMessage.sender === 'agent') {
+      // Process message through AI with agent ID
+      const aiResponse = await processMessage(content, session.user.id)
 
-    // Save AI response
-    const { data: assistantMessage, error: aiInsertError } = await supabase
-      .from('chat_messages')
-      .insert({
-        agent_id: session.user.id,
-        content: aiResponse.content,
-        sender: 'assistant' as ChatMessageSender,
-        langsmith_trace_id: aiResponse.trace_id,
-        success: null  // Initially null, will be set by human agent later
+      // Save AI response
+      const { data: assistantMessage, error: aiInsertError } = await supabase
+        .from('chat_messages')
+        .insert({
+          agent_id: session.user.id,
+          content: aiResponse.content,
+          sender: 'assistant' as ChatMessageSender,
+          langsmith_trace_id: aiResponse.trace_id,
+          success: null  // Initially null, will be set by human agent later
+        })
+        .select()
+        .single()
+
+      if (aiInsertError) {
+        console.error('Error saving AI response:', aiInsertError)
+        return NextResponse.json(
+          { error: 'Failed to save AI response' },
+          { status: 500 }
+        )
+      }
+
+      // Return both messages
+      return NextResponse.json({
+        userMessage,
+        assistantMessage
       })
-      .select()
-      .single()
-
-    if (aiInsertError) {
-      console.error('Error saving AI response:', aiInsertError)
-      return NextResponse.json(
-        { error: 'Failed to save AI response' },
-        { status: 500 }
-      )
     }
-
-    // Return both messages
-    return NextResponse.json({
-      userMessage,
-      assistantMessage
-    })
 
   } catch (error) {
     console.error('Error in chat messages API:', error)
@@ -123,6 +126,7 @@ export async function GET(req: Request) {
       .select('*')
       .eq('agent_id', session.user.id)
       .order('created_at', { ascending: true })
+      .limit(100) // Add a reasonable limit to prevent loading too many messages
 
     if (fetchError) {
       console.error('Error fetching messages:', fetchError)
@@ -132,7 +136,25 @@ export async function GET(req: Request) {
       )
     }
 
-    return NextResponse.json(messages)
+    // Group messages by timestamp to detect duplicates
+    const uniqueMessages = messages?.reduce((acc: any[], message) => {
+      const lastMessage = acc[acc.length - 1]
+      
+      // If this is an assistant message, check if it's a duplicate
+      if (message.sender === 'assistant' && lastMessage?.sender === 'assistant' && message.created_at && lastMessage.created_at) {
+        const timeDiff = Math.abs(
+          new Date(message.created_at).getTime() - new Date(lastMessage.created_at).getTime()
+        )
+        // If messages are within 1 second of each other, consider them duplicates
+        if (timeDiff < 1000) {
+          return acc // Skip this message
+        }
+      }
+      
+      return [...acc, message]
+    }, []) || []
+
+    return NextResponse.json(uniqueMessages)
 
   } catch (error) {
     console.error('Error in chat messages API:', error)

@@ -5,6 +5,7 @@ import { Button, Input, ScrollArea } from "./ui"
 import { cn } from "../lib/utils"
 import { useAuth } from "../contexts/AuthContext"
 import { hasRequiredRole } from "../auth/utils"
+import { Send } from "lucide-react"
 
 interface Message {
   id: string
@@ -34,6 +35,7 @@ export function ChatWindow({ className }: ChatWindowProps) {
   const [input, setInput] = React.useState("")
   const [isSending, setIsSending] = React.useState(false)
   const scrollRef = React.useRef<HTMLDivElement>(null)
+  const submissionTimeRef = React.useRef<number>(0)  // Add this line
 
   // Fetch messages on mount
   React.useEffect(() => {
@@ -60,11 +62,22 @@ export function ChatWindow({ className }: ChatWindowProps) {
     }
   }, [messages])
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Prevent duplicate submissions within 1 second
+    const now = Date.now()
+    if (now - submissionTimeRef.current < 1000) {
+      return
+    }
+    submissionTimeRef.current = now
+    
     if (!input.trim() || isSending) return
 
     setIsSending(true)
+    const messageContent = input.trim()  // Capture the input value
+    setInput("")  // Clear input immediately
+    
     try {
       // Add a temporary typing message
       const tempTypingMessage: Message = {
@@ -78,17 +91,16 @@ export function ChatWindow({ className }: ChatWindowProps) {
       // First add the user's message to the UI immediately
       const userMessage: Message = {
         id: 'pending',
-        content: input.trim(),
+        content: messageContent,
         sender: 'agent',
         created_at: new Date().toISOString()
       }
       setMessages(prev => [...prev, userMessage, tempTypingMessage])
-      setInput("") // Clear input immediately after sending
 
       const response = await fetch('/api/chat-messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: input.trim() })
+        body: JSON.stringify({ content: messageContent })
       })
 
       if (!response.ok) {
@@ -193,11 +205,10 @@ export function ChatWindow({ className }: ChatWindowProps) {
               />
               <Button 
                 type="submit" 
-                size="sm"
-                disabled={isSending}
-                className="text-base px-6 shadow-sm"
+                disabled={!input.trim() || isSending}
+                className="self-end"
               >
-                {isSending ? "..." : "Send"}
+                <Send className="w-4 h-4" />
               </Button>
             </div>
           </form>

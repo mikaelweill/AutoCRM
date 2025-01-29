@@ -33,6 +33,7 @@ interface TicketActivity {
 class TicketTool extends Tool {
   name = 'ticket'
   private agentId: string
+  private static lastProcessedComments = new Map<string, number>()
 
   constructor(agentId: string) {
     super()
@@ -151,6 +152,30 @@ The tool will handle:
           })
         }
         const content = contentMatch[1].trim()
+        
+        // Prevent duplicate comment creation by checking if we've already processed this exact comment
+        const commentKey = `${ticketNumber}-${content}`
+        const now = Date.now()
+        const lastProcessed = TicketTool.lastProcessedComments.get(commentKey)
+        
+        // If we've processed this exact comment in the last 5 seconds, skip it
+        if (lastProcessed && now - lastProcessed < 5000) {
+          return JSON.stringify({
+            success: true,
+            message: 'Comment already processed'
+          })
+        }
+        
+        // Store this comment with its timestamp
+        TicketTool.lastProcessedComments.set(commentKey, now)
+        
+        // Clean up old entries (older than 1 minute)
+        Array.from(TicketTool.lastProcessedComments.entries()).forEach(([key, timestamp]) => {
+          if (now - timestamp > 60000) {
+            TicketTool.lastProcessedComments.delete(key)
+          }
+        })
+
         const result = await ticketActionService.addComment(
           ticketNumber,
           content,
