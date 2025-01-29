@@ -272,6 +272,37 @@ class DecisionNode implements Node {
 - Advanced features
 - Enhanced error handling
 
+## Ticket Management Rules
+
+### 1. Assignment Rules
+- Can claim/unclaim tickets
+- When claiming a ticket, it should be marked as "in_progress"
+- Can't claim already assigned tickets
+- Can only unclaim your own tickets
+
+### 2. Status Management Rules
+- Valid status transitions:
+  ```
+  new → in_progress, cancelled
+  in_progress → resolved, cancelled
+  resolved → closed, in_progress
+  closed → in_progress
+  cancelled → in_progress
+  ```
+- Can only change status of tickets assigned to you
+
+### 3. Comment Rules
+- Can only comment on tickets assigned to you
+- Comments can be internal or public
+- Comments should be tracked in ticket activities
+
+### 4. Action Tracking
+- All actions should be logged with:
+  - Tool/Action Used
+  - Timestamp
+  - Agent ID
+  - Success Status
+
 ## Technical Considerations
 
 ### Performance
