@@ -58,9 +58,24 @@ export function ChatWindow({ className }: ChatWindowProps) {
 
   React.useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      const scrollElement = scrollRef.current;
+      scrollElement.scrollTo({
+        top: scrollElement.scrollHeight,
+        behavior: 'smooth'
+      });
     }
   }, [messages])
+
+  // New effect to scroll when chat is opened
+  React.useEffect(() => {
+    if (isOpen && scrollRef.current) {
+      const scrollElement = scrollRef.current;
+      scrollElement.scrollTo({
+        top: scrollElement.scrollHeight,
+        behavior: 'auto' // Use instant scroll on open
+      });
+    }
+  }, [isOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

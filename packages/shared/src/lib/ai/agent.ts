@@ -42,6 +42,8 @@ class TicketTool extends Tool {
 
   description = `Manage ticket operations. Commands should be in natural language.
 Examples:
+- "tell me about ticket #123"
+- "what is the status of ticket #456"
 - "assign ticket #123 to me"
 - "mark ticket #456 as resolved"
 - "set priority of ticket #789 to high"
@@ -50,6 +52,7 @@ Examples:
 - "unassign ticket #890"
 
 The tool will handle:
+- Ticket lookups and status checks
 - Ticket assignment (self only)
 - Status updates (new, in_progress, resolved, closed, cancelled)
 - Priority updates (low, medium, high, urgent)
@@ -67,7 +70,7 @@ The tool will handle:
       const currentAgentId = this.agentId
 
       // Extract ticket number from command
-      const ticketMatch = command.match(/#(\d+)/)
+      const ticketMatch = command.match(/#?(\d+)/)
       if (!ticketMatch) {
         return JSON.stringify({
           success: false,
@@ -76,7 +79,23 @@ The tool will handle:
       }
       const ticketNumber = parseInt(ticketMatch[1])
 
-      // Validate ticket exists
+      // Check for lookup/info requests first
+      if (command.match(/tell|about|show|get|what|content|info|details|status|look up/i)) {
+        const ticketContent = await ticketActionService.getTicketContent(ticketNumber)
+        if (!ticketContent) {
+          return JSON.stringify({
+            success: false,
+            error: `Ticket #${ticketNumber} not found`
+          })
+        }
+        
+        return JSON.stringify({
+          success: true,
+          data: ticketContent
+        })
+      }
+
+      // For other operations, validate ticket exists
       const ticketExists = await ticketActionService.validateTicket(ticketNumber)
       if (!ticketExists) {
         return JSON.stringify({
