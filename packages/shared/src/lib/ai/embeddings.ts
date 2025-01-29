@@ -31,7 +31,7 @@ export async function generateTicketEmbedding(ticket: Ticket) {
 
   const embedding = await generateEmbedding(ticketText);
   return {
-    embedding: JSON.stringify(embedding),
+    embedding,
     ticketText
   };
 }
@@ -66,16 +66,16 @@ export async function storeAndFindSimilarTickets(ticket: TicketEmbeddingData) {
       .from('ticket_embeddings')
       .upsert({
         id: ticket.id,
-        embedding,
+        embedding: JSON.stringify(embedding),
         ticket_text: ticketText,
       });
 
     if (storeError) throw storeError;
 
-    // Find similar tickets - parse the embedding back to array for the RPC call
+    // Find similar tickets - convert embedding to string for RPC call
     const { data: similarTickets, error: searchError } = await supabase
       .rpc('match_tickets', {
-        query_embedding: JSON.parse(embedding),
+        query_embedding: JSON.stringify(embedding),
         match_threshold: 0.7,
         match_count: 5
       });
@@ -173,8 +173,7 @@ export async function updateTicketEmbeddingWithComments(ticketId: string) {
     `.trim();
 
     console.log('Generating embedding...');
-    const rawEmbedding = await generateEmbedding(ticketText);
-    const embedding = JSON.stringify(rawEmbedding);
+    const embedding = await generateEmbedding(ticketText);
     console.log('Embedding generated');
 
     console.log('Upserting embedding...');
@@ -182,7 +181,7 @@ export async function updateTicketEmbeddingWithComments(ticketId: string) {
       .from('ticket_embeddings')
       .upsert({
         id: ticketId,
-        embedding,
+        embedding: JSON.stringify(embedding),
         ticket_text: ticketText,
       });
 
@@ -219,7 +218,7 @@ export async function generateKBArticleEmbedding(article: KBArticleEmbeddingData
 
   const embedding = await generateEmbedding(articleText);
   return {
-    embedding: JSON.stringify(embedding),
+    embedding,
     articleText
   };
 }
@@ -231,16 +230,15 @@ export async function storeKBArticleEmbedding(article: KBArticleEmbeddingData) {
     console.log('Generating embedding for KB article:', article.id);
     
     // Generate embedding
-    const { embedding: rawEmbedding, articleText } = await generateKBArticleEmbedding(article);
-    const embedding = JSON.stringify(rawEmbedding);
+    const { embedding, articleText } = await generateKBArticleEmbedding(article);
 
     console.log('Storing KB article embedding...');
-    // Store embedding
+    // Store embedding - stringify for database storage
     const { error: storeError } = await supabase
       .from('knowledge_base_article_embeddings')
       .upsert({
         id: article.id,
-        embedding,
+        embedding: JSON.stringify(embedding),
         article_text: articleText,
       });
 
@@ -322,7 +320,7 @@ export async function generateKBSummaryEmbedding(summaryData: KBSummaryData) {
 
   const embedding = await generateEmbedding(summaryText);
   return {
-    embedding: JSON.stringify(embedding),
+    embedding,
     summaryText
   };
 }
@@ -334,8 +332,7 @@ export async function storeKBSummaryEmbedding(summaryData: KBSummaryData) {
     console.log('Generating embedding for KB summary:', summaryData.id);
     
     // Generate embedding
-    const { embedding: rawEmbedding, summaryText } = await generateKBSummaryEmbedding(summaryData);
-    const embedding = JSON.stringify(rawEmbedding);
+    const { embedding, summaryText } = await generateKBSummaryEmbedding(summaryData);
 
     console.log('Storing KB summary embedding...');
     // Store embedding
@@ -343,7 +340,7 @@ export async function storeKBSummaryEmbedding(summaryData: KBSummaryData) {
       .from('knowledge_base_summary_embeddings')
       .upsert({
         id: summaryData.id,
-        embedding,
+        embedding: JSON.stringify(embedding),
         summary_text: summaryText,
       });
 

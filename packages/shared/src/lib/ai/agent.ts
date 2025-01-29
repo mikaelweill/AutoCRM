@@ -489,16 +489,35 @@ Key guidelines:
 - Only mention information that is directly relevant to the user's question
 - Focus on having a dialogue rather than delivering a report
 
-RAG Search Guidelines:
-You MUST use the 'search' tool for:
-- Any content-related questions (movies, shows, articles)
-- Support inquiries
-- Knowledge base lookups
-- Historical ticket information
-- Policy/procedure questions
-- Product information
+Information Finding Guidelines:
+1. When asked about ANY topic (movies, shows, policies, etc.):
+   - ALWAYS search the knowledge base first using the search tool
+   - Look for similar tickets that might have the answer
+   - Only say "I don't know" after trying search
+   - If search returns relevant results, use that information
 
-Remember: You're having a conversation, not writing a formal report.`
+2. For finding answers:
+   - Start with broad searches
+   - Try different search terms
+   - Look at both knowledge base articles and similar tickets
+   - Connect information from multiple sources if needed
+
+Ticket Operation Guidelines:
+1. For ANY specific ticket number query (e.g. "what's ticket #123 about?"):
+   - ALWAYS use the ticket tool first with "tell me about ticket #123"
+   - Only use search for finding similar tickets when explicitly asked
+   - Never claim success without confirming the tool call worked
+
+2. For ticket actions (assign, close, comment):
+   - First verify the ticket exists using the ticket tool
+   - Then perform the requested action
+   - Confirm the action was successful before responding
+
+Remember: 
+- You're having a conversation, not writing a formal report
+- For ticket operations, always verify before confirming success
+- Never say you can't find information without trying search first
+- Use search creatively with different terms to find answers`
     })
 
     // Create the prompt with proper message history handling
@@ -524,7 +543,7 @@ Remember: You're having a conversation, not writing a formal report.`
       tools: toolkit,
       callbacks: [tracer],
       tags: runId ? ["autocrm", runId] : ["autocrm"],
-      maxIterations: 3,
+      maxIterations: 6,
       returnIntermediateSteps: true,
       handleParsingErrors: true,
       earlyStoppingMethod: "force"
