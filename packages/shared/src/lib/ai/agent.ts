@@ -2,7 +2,7 @@ import { ChatOpenAI } from '@langchain/openai'
 import { AgentExecutor, createOpenAIToolsAgent } from 'langchain/agents'
 import { Tool } from '@langchain/core/tools'
 import { ChatPromptTemplate } from '@langchain/core/prompts'
-import { MessageType, MessageClassification, AgentResponse } from './types'
+import { MessageType, AgentResponse } from './types'
 import { LangChainTracer } from 'langchain/callbacks'
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base'
 import { v4 as uuidv4 } from 'uuid'
@@ -10,24 +10,6 @@ import { performRAGSearch } from './rag'
 import { z } from 'zod'
 import { ticketActionService, TicketStatus, TicketPriority } from './ticket_action'
 
-// Define our tool interfaces
-interface ToolResult {
-  success: boolean
-  data?: any
-  error?: string
-}
-
-// Define activity type
-interface TicketActivity {
-  content: string
-  created_at: string
-  activity_type: string
-  is_internal: boolean
-  user: {
-    email: string
-    full_name: string
-  }
-}
 
 // Define our tools
 class TicketTool extends Tool {
@@ -45,6 +27,8 @@ Examples:
 - "tell me about ticket #123"
 - "what is the status of ticket #456"
 - "assign ticket #123 to me"
+- "close ticket #456"
+- "open ticket #789"
 - "mark ticket #456 as resolved"
 - "set priority of ticket #789 to high"
 - "add comment to ticket #234: Customer issue has been fixed"
@@ -54,10 +38,18 @@ Examples:
 The tool will handle:
 - Ticket lookups and status checks
 - Ticket assignment (self only)
-- Status updates (new, in_progress, resolved, closed, cancelled)
+- Direct status commands (close, open, reopen)
+- Status updates with valid transitions:
+  * new → in_progress, cancelled
+  * in_progress → cancelled, closed
+  * resolved → closed, in_progress
+  * closed → in_progress
+  * cancelled → in_progress
 - Priority updates (low, medium, high, urgent)
 - Adding comments (public or internal)
-- Unassigning tickets`
+- Unassigning tickets
+
+Note: To close a ticket, it must be in 'in_progress' status first.`
 
   schema = z.object({
     input: z.string().optional().describe('Natural language command')
@@ -115,6 +107,26 @@ The tool will handle:
         return JSON.stringify(result)
       }
 
+      // Check for direct status commands first
+      if (command.match(/close ticket|close #/i)) {
+        const result = await ticketActionService.updateStatus(
+          ticketNumber,
+          'closed' as TicketStatus,
+          currentAgentId
+        )
+        return JSON.stringify(result)
+      }
+
+      if (command.match(/open ticket|open #|reopen ticket|reopen #/i)) {
+        const result = await ticketActionService.updateStatus(
+          ticketNumber,
+          'in_progress' as TicketStatus,
+          currentAgentId
+        )
+        return JSON.stringify(result)
+      }
+
+      // Then check for general status update commands
       if (command.match(/mark.*as|set.*status|change.*status/i)) {
         const statusMatch = command.match(/as\s+(\w+)|status\s+(?:to\s+)?(\w+)/i)
         if (!statusMatch) {
@@ -130,6 +142,31 @@ The tool will handle:
             error: 'Invalid status. Valid statuses are: new, in_progress, resolved, closed, cancelled'
           })
         }
+
+        // Get current ticket status first
+        const ticketContent = await ticketActionService.getTicketContent(ticketNumber)
+        if (!ticketContent) {
+          return JSON.stringify({
+            success: false,
+            error: `Ticket #${ticketNumber} not found`
+          })
+        }
+
+        // If trying to close and not in_progress, try to transition to in_progress first
+        if (status === 'closed' && ticketContent.currentStatus !== 'in_progress') {
+          const transitionResult = await ticketActionService.updateStatus(
+            ticketNumber,
+            'in_progress' as TicketStatus,
+            currentAgentId
+          )
+          if (!transitionResult.success) {
+            return JSON.stringify({
+              success: false,
+              error: `Cannot close ticket. First transition to in_progress failed: ${transitionResult.message}`
+            })
+          }
+        }
+
         const result = await ticketActionService.updateStatus(
           ticketNumber,
           status as TicketStatus,

@@ -3,7 +3,6 @@ import { Database } from '../../types/database'
 
 type Tables = Database['public']['Tables']
 type TicketRow = Tables['tickets']['Row']
-type TicketActivityRow = Tables['ticket_activities']['Row']
 type TicketPriority = Database['public']['Enums']['ticket_priority']
 type TicketStatus = Database['public']['Enums']['ticket_status']
 type ActivityType = Database['public']['Enums']['activity_type']
@@ -37,6 +36,16 @@ export class TicketActionService {
     currentStatus: TicketStatus;
     currentAgentId: string | null;
     client: { id: string; email: string; full_name: string | null } | null;
+    activities: Array<{
+      content: string | null;
+      created_at: string;
+      activity_type: ActivityType;
+      is_internal: boolean | null;
+      user: {
+        email: string;
+        full_name: string | null;
+      };
+    }>;
   } | null> {
     const { data, error } = await this.supabase
       .from('tickets')
@@ -47,7 +56,14 @@ export class TicketActionService {
         description,
         status,
         agent_id,
-        client:users!client_id(id, email, full_name)
+        client:users!client_id(id, email, full_name),
+        activities:ticket_activities(
+          content,
+          created_at,
+          activity_type,
+          is_internal,
+          user:users(email, full_name)
+        )
       `)
       .eq('number', ticketNumber)
       .single()
@@ -61,7 +77,8 @@ export class TicketActionService {
       description: data.description,
       currentStatus: data.status as TicketStatus,
       currentAgentId: data.agent_id,
-      client: data.client
+      client: data.client,
+      activities: data.activities
     }
   }
 

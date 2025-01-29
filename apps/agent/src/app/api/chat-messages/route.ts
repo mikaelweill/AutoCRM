@@ -125,8 +125,8 @@ export async function GET(req: Request) {
       .from('chat_messages')
       .select('*')
       .eq('agent_id', session.user.id)
-      .order('created_at', { ascending: true })
-      .limit(100) // Add a reasonable limit to prevent loading too many messages
+      .order('created_at', { ascending: false })
+      .limit(100)
 
     if (fetchError) {
       console.error('Error fetching messages:', fetchError)
@@ -154,7 +154,8 @@ export async function GET(req: Request) {
       return [...acc, message]
     }, []) || []
 
-    return NextResponse.json(uniqueMessages)
+    // Reverse the array to maintain correct chat display order (oldest first, newest last)
+    return NextResponse.json(uniqueMessages.reverse())
 
   } catch (error) {
     console.error('Error in chat messages API:', error)
