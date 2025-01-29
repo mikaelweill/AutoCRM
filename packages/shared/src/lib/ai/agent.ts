@@ -1,7 +1,7 @@
 import { ChatOpenAI } from '@langchain/openai'
 import { AgentExecutor, createOpenAIFunctionsAgent } from 'langchain/agents'
 import { Tool } from '@langchain/core/tools'
-import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts'
+import { ChatPromptTemplate, MessagesPlaceholder, BaseMessagePromptTemplateLike } from '@langchain/core/prompts'
 import { MessageType, AgentResponse } from './types'
 import { LangChainTracer } from 'langchain/callbacks'
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base'
@@ -10,14 +10,38 @@ import { performRAGSearch } from './rag'
 import { z } from 'zod'
 import { ticketActionService, TicketStatus, TicketPriority } from './ticket_action'
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages'
-import { AgentStep } from '@langchain/core/agents'
 
+// Define AgentStep interface
+interface AgentStep {
+  action: {
+    tool: string;
+    [key: string]: any;
+  };
+  observation: string;
+}
+
+// Define AgentState interface
+interface AgentState {
+  chatHistory: Array<{
+    role: 'human' | 'assistant';
+    content: string;
+  }>;
+  currentSteps: AgentStep[];
+  conversationContext: Record<string, unknown>;
+}
 
 // Define our tools
 class TicketTool extends Tool {
   name = 'ticket'
   private agentId: string
   private static lastProcessedComments = new Map<string, number>()
+  private currentExecutionState: Map<string, {
+    ticketId: string;
+    actionType: 'lookup' | 'assign' | 'unassign' | 'status' | 'priority' | 'comment';
+    completed: boolean;
+    attempts: number;
+    lastError?: string;
+  }> = new Map();
 
   constructor(agentId: string) {
     super()
@@ -57,21 +81,62 @@ Note: To close a ticket, it must be in 'in_progress' status first.`
     input: z.string().optional().describe('Natural language command')
   }).transform(obj => obj.input)
 
+  private getActionType(command: string): 'lookup' | 'assign' | 'unassign' | 'status' | 'priority' | 'comment' {
+    if (command.match(/tell|about|show|get|what|content|info|details|status|look up/i)) return 'lookup';
+    if (command.match(/assign.*to me/i)) return 'assign';
+    if (command.match(/unassign/i)) return 'unassign';
+    if (command.match(/close ticket|close #|open ticket|open #|reopen ticket|reopen #|mark.*as|set.*status|change.*status/i)) return 'status';
+    if (command.match(/priority/i)) return 'priority';
+    if (command.match(/add.*(?:internal note|comment)/i)) return 'comment';
+    return 'lookup'; // Default to lookup for unknown commands
+  }
+
   async _call(input: string): Promise<string> {
     try {
-      // Use the command directly, no need to parse JSON anymore
-      const command = input
-      const currentAgentId = this.agentId
+      const command = input;
+      const currentAgentId = this.agentId;
 
       // Extract ticket number from command
-      const ticketMatch = command.match(/#?(\d+)/)
+      const ticketMatch = command.match(/#?(\d+)/);
       if (!ticketMatch) {
         return JSON.stringify({
           success: false,
           error: 'No ticket number found in command. Please specify a ticket number (e.g., #123)'
-        })
+        });
       }
-      const ticketNumber = parseInt(ticketMatch[1])
+      const ticketNumber = parseInt(ticketMatch[1]);
+
+      // Get action type and create state key
+      const actionType = this.getActionType(command);
+      const stateKey = `${ticketNumber}-${actionType}`;
+      
+      // Check state
+      const state = this.currentExecutionState.get(stateKey);
+      if (state?.completed) {
+        return JSON.stringify({
+          success: true,
+          message: `Action already completed for ticket #${ticketNumber}`
+        });
+      }
+
+      const attempts = state?.attempts ?? 0;
+      const lastError = state?.lastError;
+
+      if (attempts >= 3) {
+        return JSON.stringify({
+          success: false,
+          error: `Failed to complete action after ${attempts} attempts. Last error: ${lastError}`
+        });
+      }
+
+      // Update state for this attempt
+      this.currentExecutionState.set(stateKey, {
+        ticketId: ticketNumber.toString(),
+        actionType,
+        completed: false,
+        attempts: attempts + 1,
+        lastError
+      });
 
       // Check for lookup/info requests first
       if (command.match(/tell|about|show|get|what|content|info|details|status|look up/i)) {
@@ -243,18 +308,44 @@ Note: To close a ticket, it must be in 'in_progress' status first.`
         return JSON.stringify(result)
       }
 
+      // On success, mark action as completed
+      this.currentExecutionState.set(stateKey, {
+        ...this.currentExecutionState.get(stateKey)!,
+        completed: true,
+        lastError: undefined
+      });
+
       return JSON.stringify({
         success: false,
         error: 'Unrecognized command. Please check the tool description for supported commands.'
       })
 
     } catch (error) {
-      console.error('Error in TicketTool:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error in TicketTool:', error);
+      
+      // Update error state if we have a ticket number
+      const ticketMatch = input.match(/#?(\d+)/);
+      if (ticketMatch) {
+        const ticketNumber = parseInt(ticketMatch[1]);
+        const actionType = this.getActionType(input);
+        const stateKey = `${ticketNumber}-${actionType}`;
+        
+        this.currentExecutionState.set(stateKey, {
+          ...this.currentExecutionState.get(stateKey)!,
+          lastError: errorMessage
+        });
+      }
+
       return JSON.stringify({
         success: false,
-        error: error instanceof Error ? error.message : 'An unknown error occurred'
-      })
+        error: errorMessage
+      });
     }
+  }
+
+  public cleanupExecution() {
+    this.currentExecutionState.clear();
   }
 }
 
@@ -360,11 +451,7 @@ interface FormattedStep {
   thought?: string;
 }
 
-// Update AgentState interface
-interface AgentState {
-  chatHistory: ConversationMessage[];
-}
-
+// Use the existing AgentState interface from the top of the file
 const agentStates = new Map<string, AgentState>();
 
 // Create and export our agent setup function
@@ -381,7 +468,7 @@ export async function createAssistantAgent(
     // Initialize the LLM
     console.log('Initializing LLM...')
     const llm = new ChatOpenAI({
-      modelName: "gpt-4",
+      modelName: "gpt-4o-mini",
       temperature: 0,
       openAIApiKey: process.env.OPENAI_API_KEY
     })
@@ -416,13 +503,13 @@ Remember: You're having a conversation, not writing a formal report.`
 
     // Create the prompt with proper message history handling
     const prompt = ChatPromptTemplate.fromMessages([
-      systemMessage,
+      new SystemMessage({ content: systemMessage.content }),
       new MessagesPlaceholder("chat_history"),
       new MessagesPlaceholder("agent_scratchpad"),
       ["human", "{input}"]
-    ])
+    ] as BaseMessagePromptTemplateLike[])
 
-    // Create the agent using OpenAIFunctionsAgent
+    // Create the agent using createOpenAIFunctionsAgent
     console.log('Creating agent...')
     const agent = await createOpenAIFunctionsAgent({
       llm,
@@ -485,9 +572,12 @@ export async function processMessage(content: string, agentId: string): Promise<
 
     // Get or initialize conversation history
     if (!agentStates.has(agentId)) {
-      agentStates.set(agentId, {
-        chatHistory: []
-      });
+      const initialState: AgentState = {
+        chatHistory: [],
+        currentSteps: [],
+        conversationContext: {} as Record<string, unknown>
+      };
+      agentStates.set(agentId, initialState);
     }
     const agentState = agentStates.get(agentId)!;
 
