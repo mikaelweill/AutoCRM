@@ -13,6 +13,7 @@ interface Message {
   sender: "agent" | "assistant"
   created_at: string
   isTyping?: boolean  // Add this for typing indicator
+  success?: boolean   // Store feedback result
 }
 
 interface ChatWindowProps {
@@ -28,14 +29,24 @@ const TypingIndicator = () => (
   </div>
 )
 
+// Add FeedbackRequest component
+const FeedbackRequest: React.FC<{ onFeedback: (success: boolean) => void }> = ({ onFeedback }) => (
+  <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+    <span>Was this action successful?</span>
+    <button onClick={() => onFeedback(true)} className="hover:text-green-600">✅ Yes</button>
+    <button onClick={() => onFeedback(false)} className="hover:text-red-600">❌ No</button>
+  </div>
+)
+
 export function ChatWindow({ className }: ChatWindowProps) {
   const { user, loading } = useAuth()
   const [isOpen, setIsOpen] = React.useState(false)  // Start closed
   const [messages, setMessages] = React.useState<Message[]>([])
   const [input, setInput] = React.useState("")
   const [isSending, setIsSending] = React.useState(false)
+  const [toolUsedMessages, setToolUsedMessages] = React.useState<Set<string>>(new Set()) // Track which messages used tools
   const scrollRef = React.useRef<HTMLDivElement>(null)
-  const submissionTimeRef = React.useRef<number>(0)  // Add this line
+  const submissionTimeRef = React.useRef<number>(0)
 
   // Fetch messages on mount
   React.useEffect(() => {
@@ -122,7 +133,7 @@ export function ChatWindow({ className }: ChatWindowProps) {
         throw new Error('Failed to send message')
       }
 
-      const { userMessage: savedUserMessage, assistantMessage } = await response.json()
+      const { messages: [savedUserMessage, assistantMessage], toolsUsed } = await response.json()
       
       // Replace the pending messages with the saved ones
       setMessages(prev => 
@@ -130,12 +141,45 @@ export function ChatWindow({ className }: ChatWindowProps) {
           .filter(m => m.id !== 'pending' && m.id !== 'typing')
           .concat([savedUserMessage, assistantMessage])
       )
+
+      // If tools were used, add the message to toolUsedMessages
+      if (toolsUsed) {
+        setToolUsedMessages(prev => new Set(prev).add(assistantMessage.id))
+      }
     } catch (error) {
       console.error('Error sending message:', error)
       // Remove typing indicator and pending message on error
       setMessages(prev => prev.filter(m => m.id !== 'typing' && m.id !== 'pending'))
     } finally {
       setIsSending(false)
+    }
+  }
+
+  const handleFeedback = async (messageId: string, success: boolean) => {
+    try {
+      const response = await fetch(`/api/chat-messages/${messageId}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success })
+      })
+      
+      if (!response.ok) throw new Error('Failed to save feedback')
+      
+      // Update local state
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === messageId ? { ...msg, success } : msg
+        )
+      )
+      
+      // Remove from tool used messages since feedback was given
+      setToolUsedMessages(prev => {
+        const next = new Set(prev)
+        next.delete(messageId)
+        return next
+      })
+    } catch (error) {
+      console.error('Error saving feedback:', error)
     }
   }
 
@@ -204,6 +248,9 @@ export function ChatWindow({ className }: ChatWindowProps) {
                   <span className="text-xs text-muted-foreground/75 px-2">
                     {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
+                  {toolUsedMessages.has(message.id) && !message.success && (
+                    <FeedbackRequest onFeedback={(success) => handleFeedback(message.id, success)} />
+                  )}
                 </div>
               ))}
             </div>

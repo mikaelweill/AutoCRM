@@ -50,48 +50,108 @@ export async function POST(req: Request) {
       .single()
 
     if (insertError) {
-      console.error('Error saving message:', insertError)
+      console.error('Error inserting message:', insertError)
       return NextResponse.json(
         { error: 'Failed to save message' },
         { status: 500 }
       )
     }
 
-    // Only process messages from agents, not from the assistant
-    if (userMessage.sender === 'agent') {
-      // Process message through AI with agent ID
-      const aiResponse = await processMessage(content, session.user.id)
-
-      // Save AI response
-      const { data: assistantMessage, error: aiInsertError } = await supabase
-        .from('chat_messages')
-        .insert({
-          agent_id: session.user.id,
-          content: aiResponse.content,
-          sender: 'assistant' as ChatMessageSender,
-          langsmith_trace_id: aiResponse.trace_id,
-          success: null  // Initially null, will be set by human agent later
-        })
-        .select()
-        .single()
-
-      if (aiInsertError) {
-        console.error('Error saving AI response:', aiInsertError)
-        return NextResponse.json(
-          { error: 'Failed to save AI response' },
-          { status: 500 }
-        )
-      }
-
-      // Return both messages
-      return NextResponse.json({
-        userMessage,
-        assistantMessage
+    // Process message with AI agent
+    const agentResponse = await processMessage(content, session.user.id)
+    
+    // Insert AI response into database
+    const { data: aiMessage, error: aiInsertError } = await supabase
+      .from('chat_messages')
+      .insert({
+        agent_id: session.user.id,
+        content: agentResponse.content,
+        sender: 'assistant' as ChatMessageSender,
+        langsmith_trace_id: agentResponse.trace_id
       })
+      .select()
+      .single()
+
+    if (aiInsertError) {
+      console.error('Error inserting AI response:', aiInsertError)
+      return NextResponse.json(
+        { error: 'Failed to save AI response' },
+        { status: 500 }
+      )
     }
 
+    // Return both messages and whether tools were used
+    return NextResponse.json({
+      messages: [userMessage, aiMessage],
+      toolsUsed: agentResponse.actions && agentResponse.actions.length > 0
+    })
   } catch (error) {
-    console.error('Error in chat messages API:', error)
+    console.error('Error processing message:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// Add feedback endpoint
+export async function PATCH(req: Request) {
+  try {
+    const supabase = createRouteHandlerClient<Database>({ cookies })
+    
+    // Get current session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError || !session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Verify user is an agent
+    if (!hasRequiredRole(session.user as AuthUser, 'agent')) {
+      return NextResponse.json(
+        { error: 'Only agents can provide feedback' },
+        { status: 403 }
+      )
+    }
+
+    // Get message ID from URL
+    const messageId = req.url.split('/').pop()
+    if (!messageId) {
+      return NextResponse.json(
+        { error: 'Message ID is required' },
+        { status: 400 }
+      )
+    }
+
+    // Parse request body
+    const { success } = await req.json()
+    if (typeof success !== 'boolean') {
+      return NextResponse.json(
+        { error: 'Success boolean is required' },
+        { status: 400 }
+      )
+    }
+
+    // Update message with feedback
+    const { error: updateError } = await supabase
+      .from('chat_messages')
+      .update({ success })
+      .eq('id', messageId)
+      .eq('agent_id', session.user.id) // Ensure agent owns the message
+
+    if (updateError) {
+      console.error('Error updating message:', updateError)
+      return NextResponse.json(
+        { error: 'Failed to save feedback' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error saving feedback:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

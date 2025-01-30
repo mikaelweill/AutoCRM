@@ -632,11 +632,18 @@ export async function processMessage(content: string, agentId: string): Promise<
     console.log('Agent result:', result)
     console.log('Run ID:', runId)
 
+    // Map LangChain's intermediateSteps to our actions format
+    const actions = result.intermediateSteps?.map((step: AgentStep) => ({
+      type: step.action.tool,
+      status: JSON.parse(step.observation).success ? 'success' : 'failed',
+      details: step.observation
+    })) || []
+
     return {
       content: result.output || result.returnValues?.output || '',
       type: determineMessageType(result),
       sources: [],
-      actions: [],
+      actions,
       trace_id: runId
     }
   } catch (error) {
