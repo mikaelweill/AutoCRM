@@ -190,21 +190,28 @@ export default function AIAnalyticsPage() {
     return actions.reduce((tools: string[], action: any) => {
       try {
         if (typeof action === 'object') {
-          // Extract the type of operation (e.g., 'ticket')
-          if (action.type) {
-            tools.push(action.type);
-          }
-          
-          // If there are details, parse them for more specific operations
+          // Get all unique activity types from the details
           if (action.details && typeof action.details === 'string') {
             const details = JSON.parse(action.details);
             if (details.data?.activities) {
               const activities = details.data.activities;
               activities.forEach((activity: any) => {
-                if (activity.activity_type && !tools.includes(activity.activity_type)) {
-                  tools.push(activity.activity_type);
+                if (activity.activity_type) {
+                  // Convert activity types to more readable format
+                  const readableType = activity.activity_type
+                    .split('_')
+                    .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+                    .join(' ');
+                  if (!tools.includes(readableType)) {
+                    tools.push(readableType);
+                  }
                 }
               });
+            }
+          } else if (action.type === 'ticket') {
+            // If we only have the ticket type without details, use a generic label
+            if (!tools.includes('Ticket Manipulation')) {
+              tools.push('Ticket Manipulation');
             }
           }
         }
@@ -336,15 +343,13 @@ export default function AIAnalyticsPage() {
                       {format(new Date(run.created_at || ''), 'MMM dd, HH:mm:ss')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span 
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer ${
-                          run.success 
-                            ? 'bg-green-100 text-green-800'
-                            : run.success === false
-                            ? 'bg-red-100 text-red-800 hover:bg-red-200'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}
-                      >
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        run.success 
+                          ? 'bg-green-100 text-green-800'
+                          : run.success === false
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
                         {run.status || (run.success ? 'Success' : 'Failed')}
                       </span>
                     </td>
