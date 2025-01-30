@@ -16,7 +16,27 @@ interface Interaction {
   created_at: string
   success: boolean | null
   content: string
+  agent: {
+    email: string
+    full_name: string | null
+  } | null
+}
+
+interface LangChainMetrics {
+  averageLatency: number
+  totalTokens: number
+  totalCost: number
+  completionTokens: number
+  promptTokens: number
+}
+
+interface ChatMessage {
+  id: string
+  created_at: string
+  success: boolean | null
+  content: string
   agent_id: string | null
+  langsmith_trace_id: string | null
 }
 
 const PAGE_SIZE = 10 // Number of items per page
@@ -28,6 +48,13 @@ export default function AIAnalyticsPage() {
     failedInteractions: 0,
     notRatedInteractions: 0
   })
+  const [langChainMetrics, setLangChainMetrics] = useState<LangChainMetrics>({
+    averageLatency: 0,
+    totalTokens: 0,
+    totalCost: 0,
+    completionTokens: 0,
+    promptTokens: 0
+  })
   const [recentInteractions, setRecentInteractions] = useState<Interaction[]>([])
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(0)
@@ -36,6 +63,28 @@ export default function AIAnalyticsPage() {
   useEffect(() => {
     fetchAnalytics()
   }, [currentPage]) // Refetch when page changes
+
+  async function fetchLangChainMetrics(traceIds: string[]) {
+    try {
+      // Call your API endpoint that interfaces with LangSmith
+      const response = await fetch('/api/langchain/metrics', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ traceIds }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch LangChain metrics')
+      }
+
+      const metrics = await response.json()
+      setLangChainMetrics(metrics)
+    } catch (error) {
+      console.error('Error fetching LangChain metrics:', error)
+    }
+  }
 
   async function fetchAnalytics() {
     const supabase = createClient()
@@ -52,7 +101,7 @@ export default function AIAnalyticsPage() {
     // Get all messages for global metrics (without pagination)
     const { data: allMessages, error: metricsError } = await supabase
       .from('chat_messages')
-      .select('success')
+      .select('success, langsmith_trace_id')
 
     if (metricsError) {
       console.error('Error fetching metrics:', metricsError)
@@ -69,6 +118,15 @@ export default function AIAnalyticsPage() {
 
     setFunnelMetrics(metrics)
 
+    // Get trace IDs for LangChain metrics
+    const traceIds = allMessages
+      ?.filter(m => m.langsmith_trace_id)
+      .map(m => m.langsmith_trace_id as string) || []
+
+    if (traceIds.length > 0) {
+      await fetchLangChainMetrics(traceIds)
+    }
+
     // Then get paginated data for the table
     const { data: messages, error } = await supabase
       .from('chat_messages')
@@ -81,7 +139,7 @@ export default function AIAnalyticsPage() {
       `)
       .order('created_at', { ascending: false })
       .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1)
-      .returns<Interaction[]>()
+      .returns<ChatMessage[]>()
 
     if (error) {
       console.error('Error fetching analytics:', error)
@@ -93,7 +151,36 @@ export default function AIAnalyticsPage() {
       return
     }
 
-    setRecentInteractions(messages)
+    // Get agent details for messages that have an agent_id
+    const agentIds = messages.filter(m => m.agent_id).map(m => m.agent_id)
+    
+    let agentDetails: Record<string, { email: string, full_name: string | null }> = {}
+    
+    if (agentIds.length > 0) {
+      const { data: agents } = await supabase
+        .from('users')
+        .select('id, email, full_name')
+        .in('id', agentIds)
+        .returns<{ id: string, email: string, full_name: string | null }[]>()
+
+      if (agents) {
+        agentDetails = agents.reduce((acc, agent) => ({
+          ...acc,
+          [agent.id]: { email: agent.email, full_name: agent.full_name }
+        }), {} as Record<string, { email: string, full_name: string | null }>)
+      }
+    }
+
+    // Combine messages with agent details
+    const messagesWithAgents: Interaction[] = messages.map(msg => ({
+      id: msg.id,
+      created_at: msg.created_at,
+      success: msg.success,
+      content: msg.content,
+      agent: msg.agent_id ? agentDetails[msg.agent_id] : null
+    }))
+
+    setRecentInteractions(messagesWithAgents)
     setLoading(false)
   }
 
@@ -173,7 +260,7 @@ export default function AIAnalyticsPage() {
                   Time
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Agent ID
+                  Agent
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Message
@@ -190,10 +277,12 @@ export default function AIAnalyticsPage() {
                     {format(new Date(interaction.created_at), 'MMM d, h:mm a')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {interaction.agent_id || 'No Agent'}
+                    {interaction.agent ? (interaction.agent.full_name || interaction.agent.email) : 'No Agent'}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900">
-                    <div className="max-w-lg truncate">{interaction.content}</div>
+                    <div className="max-w-lg truncate" title={interaction.content}>
+                      {interaction.content}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {interaction.success === null ? (
@@ -260,12 +349,29 @@ export default function AIAnalyticsPage() {
         </div>
       </section>
 
-      {/* LangChain Metrics - Placeholder for now */}
+      {/* LangChain Metrics */}
       <section>
         <h2 className="text-xl font-semibold mb-4">LangChain Metrics</h2>
-        <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-gray-500">LangChain metrics integration coming soon...</p>
-          <p className="text-sm text-gray-400 mt-2">Will include response times, token usage, and costs from LangSmith API</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-gray-500 text-sm font-medium">Average Response Time</h3>
+            <p className="text-3xl font-bold mt-2">{(langChainMetrics.averageLatency / 1000).toFixed(2)}s</p>
+            <p className="text-sm text-gray-500 mt-1">Across all interactions</p>
+          </div>
+          
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-gray-500 text-sm font-medium">Total Token Usage</h3>
+            <p className="text-3xl font-bold mt-2">{langChainMetrics.totalTokens.toLocaleString()}</p>
+            <p className="text-sm text-gray-500 mt-1">
+              {langChainMetrics.promptTokens.toLocaleString()} prompt + {langChainMetrics.completionTokens.toLocaleString()} completion
+            </p>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-gray-500 text-sm font-medium">Estimated Cost</h3>
+            <p className="text-3xl font-bold mt-2">${langChainMetrics.totalCost.toFixed(2)}</p>
+            <p className="text-sm text-gray-500 mt-1">Based on OpenAI pricing</p>
+          </div>
         </div>
       </section>
     </div>
