@@ -367,6 +367,19 @@ $$;
 
 ALTER FUNCTION "public"."match_tickets"("query_embedding" "public"."vector", "match_threshold" double precision, "match_count" integer) OWNER TO "postgres";
 
+
+CREATE OR REPLACE FUNCTION "public"."trigger_set_updated_at"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."trigger_set_updated_at"() OWNER TO "postgres";
+
 SET default_tablespace = '';
 
 SET default_table_access_method = "heap";
@@ -457,6 +470,36 @@ CREATE TABLE IF NOT EXISTS "public"."knowledge_base_summary_embeddings" (
 
 
 ALTER TABLE "public"."knowledge_base_summary_embeddings" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."message_runs" (
+    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
+    "message_id" "uuid" NOT NULL,
+    "langsmith_run_id" "text",
+    "original_prompt" "text",
+    "actions" "jsonb",
+    "success" boolean,
+    "feedback_message" "text",
+    "latency" integer,
+    "token_usage" "jsonb",
+    "cost" numeric(10,4),
+    "error_type" "text",
+    "error_message" "text",
+    "created_at" timestamp with time zone DEFAULT "now"(),
+    "updated_at" timestamp with time zone DEFAULT "now"(),
+    "start_time" timestamp with time zone,
+    "end_time" timestamp with time zone,
+    "duration_ms" integer,
+    "raw_input" "text",
+    "raw_output" "text",
+    "status" character varying(50),
+    "total_tokens" integer,
+    "runtime_info" "jsonb",
+    "metadata" "jsonb"
+);
+
+
+ALTER TABLE "public"."message_runs" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."ticket_activities" (
@@ -596,6 +639,11 @@ ALTER TABLE ONLY "public"."knowledge_base_summary_embeddings"
 
 
 
+ALTER TABLE ONLY "public"."message_runs"
+    ADD CONSTRAINT "message_runs_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."ticket_activities"
     ADD CONSTRAINT "ticket_activities_pkey" PRIMARY KEY ("id");
 
@@ -643,6 +691,26 @@ CREATE INDEX "idx_kb_articles_published" ON "public"."knowledge_base_articles" U
 
 
 
+CREATE INDEX "idx_message_runs_langsmith_run_id" ON "public"."message_runs" USING "btree" ("langsmith_run_id");
+
+
+
+CREATE INDEX "idx_message_runs_message_id" ON "public"."message_runs" USING "btree" ("message_id");
+
+
+
+CREATE INDEX "idx_message_runs_start_time" ON "public"."message_runs" USING "btree" ("start_time");
+
+
+
+CREATE INDEX "idx_message_runs_status" ON "public"."message_runs" USING "btree" ("status");
+
+
+
+CREATE INDEX "idx_message_runs_success" ON "public"."message_runs" USING "btree" ("success");
+
+
+
 CREATE INDEX "idx_ticket_activities_ticket_id" ON "public"."ticket_activities" USING "btree" ("ticket_id");
 
 
@@ -680,6 +748,10 @@ CREATE INDEX "users_id_idx" ON "public"."users" USING "btree" ("id");
 
 
 CREATE OR REPLACE TRIGGER "before_insert_invitations" BEFORE INSERT ON "public"."invitations" FOR EACH ROW EXECUTE FUNCTION "public"."invitations_before_insert"();
+
+
+
+CREATE OR REPLACE TRIGGER "set_updated_at" BEFORE UPDATE ON "public"."message_runs" FOR EACH ROW EXECUTE FUNCTION "public"."trigger_set_updated_at"();
 
 
 
@@ -728,6 +800,11 @@ ALTER TABLE ONLY "public"."knowledge_base_summary_embeddings"
 
 
 
+ALTER TABLE ONLY "public"."message_runs"
+    ADD CONSTRAINT "message_runs_message_id_fkey" FOREIGN KEY ("message_id") REFERENCES "public"."chat_messages"("id");
+
+
+
 ALTER TABLE ONLY "public"."ticket_activities"
     ADD CONSTRAINT "ticket_activities_ticket_id_fkey" FOREIGN KEY ("ticket_id") REFERENCES "public"."tickets"("id") ON DELETE CASCADE;
 
@@ -744,7 +821,7 @@ ALTER TABLE ONLY "public"."ticket_emails"
 
 
 ALTER TABLE ONLY "public"."ticket_embeddings"
-    ADD CONSTRAINT "ticket_embeddings_id_fkey" FOREIGN KEY ("id") REFERENCES "public"."tickets"("id");
+    ADD CONSTRAINT "ticket_embeddings_id_fkey" FOREIGN KEY ("id") REFERENCES "public"."tickets"("id") ON DELETE CASCADE;
 
 
 
@@ -780,6 +857,18 @@ CREATE POLICY "Admins can create invitations" ON "public"."invitations" FOR INSE
 CREATE POLICY "Admins can delete invitations" ON "public"."invitations" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM "public"."users"
   WHERE (("users"."id" = "auth"."uid"()) AND ("users"."role" = 'admin'::"public"."user_role")))));
+
+
+
+CREATE POLICY "Admins can see all chat messages" ON "public"."chat_messages" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."users"
+  WHERE (("users"."id" = "auth"."uid"()) AND ("users"."role" = 'admin'::"public"."user_role")))));
+
+
+
+CREATE POLICY "Admins can view all message runs" ON "public"."message_runs" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "auth"."users"
+  WHERE (("users"."id" = "auth"."uid"()) AND (("users"."raw_user_meta_data" ->> 'role'::"text") = 'admin'::"text")))));
 
 
 
@@ -925,6 +1014,9 @@ ALTER TABLE "public"."knowledge_base_articles" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."knowledge_base_summary_embeddings" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."message_runs" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."ticket_activities" ENABLE ROW LEVEL SECURITY;
@@ -1867,6 +1959,12 @@ GRANT ALL ON FUNCTION "public"."subvector"("public"."vector", integer, integer) 
 
 
 
+GRANT ALL ON FUNCTION "public"."trigger_set_updated_at"() TO "anon";
+GRANT ALL ON FUNCTION "public"."trigger_set_updated_at"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."trigger_set_updated_at"() TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."vector_accum"(double precision[], "public"."vector") TO "postgres";
 GRANT ALL ON FUNCTION "public"."vector_accum"(double precision[], "public"."vector") TO "anon";
 GRANT ALL ON FUNCTION "public"."vector_accum"(double precision[], "public"."vector") TO "authenticated";
@@ -2083,6 +2181,12 @@ GRANT ALL ON TABLE "public"."knowledge_base_articles" TO "service_role";
 GRANT ALL ON TABLE "public"."knowledge_base_summary_embeddings" TO "anon";
 GRANT ALL ON TABLE "public"."knowledge_base_summary_embeddings" TO "authenticated";
 GRANT ALL ON TABLE "public"."knowledge_base_summary_embeddings" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."message_runs" TO "anon";
+GRANT ALL ON TABLE "public"."message_runs" TO "authenticated";
+GRANT ALL ON TABLE "public"."message_runs" TO "service_role";
 
 
 
