@@ -17,6 +17,7 @@ interface MessageRun {
   total_tokens: number | null
   error_type: string | null
   error_message: string | null
+  feedback_message: string | null
   token_usage: {
     completion_tokens?: number
     prompt_tokens?: number
@@ -44,6 +45,26 @@ interface TokenMetrics {
 
 const PAGE_SIZE = 10
 
+// Add Modal component at the top
+function Modal({ isOpen, onClose, children }: { isOpen: boolean; onClose: () => void; children: React.ReactNode }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+      <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+        <div className="flex justify-end">
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function AIAnalyticsPage() {
   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics>({
     totalRuns: 0,
@@ -64,6 +85,7 @@ export default function AIAnalyticsPage() {
   const [currentPage, setCurrentPage] = useState(0)
   const [totalCount, setTotalCount] = useState(0)
   const [timeSeriesData, setTimeSeriesData] = useState<any[]>([])
+  const [selectedRun, setSelectedRun] = useState<MessageRun | null>(null);
 
   useEffect(() => {
     fetchAnalytics()
@@ -161,6 +183,38 @@ export default function AIAnalyticsPage() {
     })
   }
 
+  // Function to extract tools from actions
+  function extractToolsFromActions(actions: any[] | null): string[] {
+    if (!actions) return [];
+    
+    return actions.reduce((tools: string[], action: any) => {
+      try {
+        if (typeof action === 'object') {
+          // Extract the type of operation (e.g., 'ticket')
+          if (action.type) {
+            tools.push(action.type);
+          }
+          
+          // If there are details, parse them for more specific operations
+          if (action.details && typeof action.details === 'string') {
+            const details = JSON.parse(action.details);
+            if (details.data?.activities) {
+              const activities = details.data.activities;
+              activities.forEach((activity: any) => {
+                if (activity.activity_type && !tools.includes(activity.activity_type)) {
+                  tools.push(activity.activity_type);
+                }
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing action:', e);
+      }
+      return tools;
+    }, []);
+  }
+
   if (loading) {
     return (
       <div className="p-6">
@@ -191,7 +245,7 @@ export default function AIAnalyticsPage() {
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-gray-500 text-sm font-medium">Average Response Time</h3>
-          <p className="text-3xl font-bold mt-2">{(performanceMetrics.averageLatency || 0).toLocaleString()}ms</p>
+          <p className="text-3xl font-bold mt-2">{Math.round(performanceMetrics.averageLatency || 0).toLocaleString()}ms</p>
           <p className="text-sm text-gray-500 mt-1">Latency per request</p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
@@ -264,34 +318,33 @@ export default function AIAnalyticsPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tokens</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cost</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Original Prompt</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tools Used</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Error</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {recentRuns.map((run) => {
-                // Extract tool usage information
-                const toolsUsed = run.actions?.map(action => {
-                  if (typeof action === 'object' && action.tool) {
-                    return action.tool;
-                  }
-                  return null;
-                }).filter(Boolean);
+                const toolsUsed = extractToolsFromActions(run.actions);
 
                 return (
-                  <tr key={run.id}>
+                  <tr 
+                    key={run.id}
+                    onClick={() => setSelectedRun(run)}
+                    className="hover:bg-gray-50 cursor-pointer"
+                  >
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {format(new Date(run.created_at || ''), 'MMM dd, HH:mm:ss')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        run.success 
-                          ? 'bg-green-100 text-green-800'
-                          : run.success === false
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}>
+                      <span 
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer ${
+                          run.success 
+                            ? 'bg-green-100 text-green-800'
+                            : run.success === false
+                            ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}
+                      >
                         {run.status || (run.success ? 'Success' : 'Failed')}
                       </span>
                     </td>
@@ -304,13 +357,8 @@ export default function AIAnalyticsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {run.cost ? `$${run.cost.toFixed(4)}` : '-'}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500 max-w-md">
-                      <div className="truncate" title={run.original_prompt || ''}>
-                        {run.original_prompt || '-'}
-                      </div>
-                    </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
-                      {toolsUsed?.length ? (
+                      {toolsUsed.length ? (
                         <div className="flex flex-wrap gap-1">
                           {toolsUsed.map((tool, idx) => (
                             <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
@@ -353,6 +401,74 @@ export default function AIAnalyticsPage() {
           </div>
         </div>
       </section>
+
+      {/* Add Modal */}
+      <Modal 
+        isOpen={!!selectedRun} 
+        onClose={() => setSelectedRun(null)}
+      >
+        {selectedRun && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Run Details</h3>
+            
+            <div className="space-y-2">
+              <h4 className="font-medium">Original Prompt</h4>
+              <p className="text-gray-700 whitespace-pre-wrap bg-gray-50 rounded p-3">
+                {selectedRun.original_prompt || 'No prompt available'}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="font-medium">Feedback</h4>
+              <p className="text-gray-700 whitespace-pre-wrap bg-gray-50 rounded p-3">
+                {selectedRun.feedback_message || 'No feedback available'}
+              </p>
+            </div>
+
+            {selectedRun.error_message && (
+              <div className="space-y-2">
+                <h4 className="font-medium">Error</h4>
+                <p className="text-red-600 whitespace-pre-wrap bg-red-50 rounded p-3">
+                  {selectedRun.error_message}
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <h4 className="font-medium">Tools Used</h4>
+              <div className="flex flex-wrap gap-2">
+                {extractToolsFromActions(selectedRun.actions).map((tool, idx) => (
+                  <span key={idx} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
+                    {tool}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="font-medium">Runtime Information</h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">Duration: </span>
+                  {selectedRun.duration_ms ? `${selectedRun.duration_ms.toLocaleString()}ms` : '-'}
+                </div>
+                <div>
+                  <span className="font-medium">Tokens: </span>
+                  {selectedRun.total_tokens?.toLocaleString() || '-'}
+                </div>
+                <div>
+                  <span className="font-medium">Cost: </span>
+                  {selectedRun.cost ? `$${selectedRun.cost.toFixed(4)}` : '-'}
+                </div>
+                <div>
+                  <span className="font-medium">Status: </span>
+                  {selectedRun.status || 'Unknown'}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 } 
