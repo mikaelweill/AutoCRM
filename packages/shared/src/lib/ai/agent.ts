@@ -543,7 +543,7 @@ Remember:
       tools: toolkit,
       callbacks: [tracer],
       tags: runId ? ["autocrm", runId] : ["autocrm"],
-      maxIterations: 6,
+      maxIterations: 15,
       returnIntermediateSteps: true,
       handleParsingErrors: true,
       earlyStoppingMethod: "force"

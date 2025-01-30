@@ -261,6 +261,8 @@ export type Database = {
           actions: Json | null
           cost: number | null
           created_at: string | null
+          duration_ms: number | null
+          end_time: string | null
           error_message: string | null
           error_type: string | null
           feedback_message: string | null
@@ -268,15 +270,24 @@ export type Database = {
           langsmith_run_id: string | null
           latency: number | null
           message_id: string
+          metadata: Json | null
           original_prompt: string | null
+          raw_input: string | null
+          raw_output: string | null
+          runtime_info: Json | null
+          start_time: string | null
+          status: string | null
           success: boolean | null
           token_usage: Json | null
+          total_tokens: number | null
           updated_at: string | null
         }
         Insert: {
           actions?: Json | null
           cost?: number | null
           created_at?: string | null
+          duration_ms?: number | null
+          end_time?: string | null
           error_message?: string | null
           error_type?: string | null
           feedback_message?: string | null
@@ -284,15 +295,24 @@ export type Database = {
           langsmith_run_id?: string | null
           latency?: number | null
           message_id: string
+          metadata?: Json | null
           original_prompt?: string | null
+          raw_input?: string | null
+          raw_output?: string | null
+          runtime_info?: Json | null
+          start_time?: string | null
+          status?: string | null
           success?: boolean | null
           token_usage?: Json | null
+          total_tokens?: number | null
           updated_at?: string | null
         }
         Update: {
           actions?: Json | null
           cost?: number | null
           created_at?: string | null
+          duration_ms?: number | null
+          end_time?: string | null
           error_message?: string | null
           error_type?: string | null
           feedback_message?: string | null
@@ -300,9 +320,16 @@ export type Database = {
           langsmith_run_id?: string | null
           latency?: number | null
           message_id?: string
+          metadata?: Json | null
           original_prompt?: string | null
+          raw_input?: string | null
+          raw_output?: string | null
+          runtime_info?: Json | null
+          start_time?: string | null
+          status?: string | null
           success?: boolean | null
           token_usage?: Json | null
+          total_tokens?: number | null
           updated_at?: string | null
         }
         Relationships: [
