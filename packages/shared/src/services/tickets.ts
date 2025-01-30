@@ -220,20 +220,16 @@ export async function createTicket(data: CreateTicketData): Promise<string> {
     const embedResponse = await fetch('/api/embeddings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: ticketText })
+      body: JSON.stringify({ 
+        text: ticketText,
+        ticketId: ticket.id
+      })
     });
 
-    if (embedResponse.ok) {
-      const { embedding } = await embedResponse.json();
-      
-      // Store embedding
-      await supabase.from('ticket_embeddings').upsert({
-        id: ticket.id,
-        embedding,
-        ticket_text: ticketText
-      });
+    if (!embedResponse.ok) {
+      console.error('Failed to generate/store embedding:', await embedResponse.text());
     }
-
+    
     // Handle attachments if any
     if (data.attachments?.length) {
       for (const file of data.attachments) {
