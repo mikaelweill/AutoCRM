@@ -5,12 +5,14 @@ import { hasRequiredRole } from 'shared/src/auth/utils'
 import { AuthUser } from 'shared/src/auth/types'
 import { Database } from 'shared/src/types/database'
 import { processMessage } from 'shared/src/lib/ai/agent'
+import { createServerClient } from 'shared/src/lib/supabase-server'
 
 type ChatMessageSender = 'agent' | 'assistant'
 
 export async function POST(req: Request) {
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies })
+    const serverClient = createServerClient()
     
     // Get current session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -39,7 +41,7 @@ export async function POST(req: Request) {
     }
 
     // Insert user message into database
-    const { data: userMessage, error: insertError } = await supabase
+    const { data: userMessage, error: insertError } = await serverClient
       .from('chat_messages')
       .insert({
         agent_id: session.user.id,
@@ -61,13 +63,12 @@ export async function POST(req: Request) {
     const agentResponse = await processMessage(content, session.user.id)
     
     // Insert AI response into database
-    const { data: aiMessage, error: aiInsertError } = await supabase
+    const { data: aiMessage, error: aiInsertError } = await serverClient
       .from('chat_messages')
       .insert({
         agent_id: session.user.id,
         content: agentResponse.content,
-        sender: 'assistant' as ChatMessageSender,
-        langsmith_trace_id: agentResponse.trace_id
+        sender: 'assistant' as ChatMessageSender
       })
       .select()
       .single()
@@ -78,6 +79,23 @@ export async function POST(req: Request) {
         { error: 'Failed to save AI response' },
         { status: 500 }
       )
+    }
+
+    // Create the message_run record
+    const { error: runInsertError } = await serverClient
+      .from('message_runs')
+      .insert({
+        message_id: aiMessage.id,
+        langsmith_run_id: agentResponse.trace_id,
+        original_prompt: content,
+        actions: agentResponse.actions,
+        success: null,
+        feedback_message: null
+      })
+
+    if (runInsertError) {
+      console.error('Error inserting message run:', runInsertError)
+      // Don't fail the request, just log the error
     }
 
     // Return both messages and whether tools were used
@@ -94,74 +112,10 @@ export async function POST(req: Request) {
   }
 }
 
-// Add feedback endpoint
-export async function PATCH(req: Request) {
-  try {
-    const supabase = createRouteHandlerClient<Database>({ cookies })
-    
-    // Get current session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    if (sessionError || !session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Verify user is an agent
-    if (!hasRequiredRole(session.user as AuthUser, 'agent')) {
-      return NextResponse.json(
-        { error: 'Only agents can provide feedback' },
-        { status: 403 }
-      )
-    }
-
-    // Get message ID from URL
-    const messageId = req.url.split('/').pop()
-    if (!messageId) {
-      return NextResponse.json(
-        { error: 'Message ID is required' },
-        { status: 400 }
-      )
-    }
-
-    // Parse request body
-    const { success } = await req.json()
-    if (typeof success !== 'boolean') {
-      return NextResponse.json(
-        { error: 'Success boolean is required' },
-        { status: 400 }
-      )
-    }
-
-    // Update message with feedback
-    const { error: updateError } = await supabase
-      .from('chat_messages')
-      .update({ success })
-      .eq('id', messageId)
-      .eq('agent_id', session.user.id) // Ensure agent owns the message
-
-    if (updateError) {
-      console.error('Error updating message:', updateError)
-      return NextResponse.json(
-        { error: 'Failed to save feedback' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error saving feedback:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-}
-
 export async function GET(req: Request) {
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies })
+    const serverClient = createServerClient()
     
     // Get current session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -181,7 +135,7 @@ export async function GET(req: Request) {
     }
 
     // Fetch messages for current agent
-    const { data: messages, error: fetchError } = await supabase
+    const { data: messages, error: fetchError } = await serverClient
       .from('chat_messages')
       .select('*')
       .eq('agent_id', session.user.id)

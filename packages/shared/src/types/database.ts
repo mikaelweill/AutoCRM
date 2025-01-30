@@ -256,6 +256,65 @@ export type Database = {
           },
         ]
       }
+      message_runs: {
+        Row: {
+          actions: Json | null
+          cost: number | null
+          created_at: string | null
+          error_message: string | null
+          error_type: string | null
+          feedback_message: string | null
+          id: string
+          langsmith_run_id: string | null
+          latency: number | null
+          message_id: string
+          original_prompt: string | null
+          success: boolean | null
+          token_usage: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          actions?: Json | null
+          cost?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          error_type?: string | null
+          feedback_message?: string | null
+          id?: string
+          langsmith_run_id?: string | null
+          latency?: number | null
+          message_id: string
+          original_prompt?: string | null
+          success?: boolean | null
+          token_usage?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          actions?: Json | null
+          cost?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          error_type?: string | null
+          feedback_message?: string | null
+          id?: string
+          langsmith_run_id?: string | null
+          latency?: number | null
+          message_id?: string
+          original_prompt?: string | null
+          success?: boolean | null
+          token_usage?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_runs_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_activities: {
         Row: {
           activity_type: Database["public"]["Enums"]["activity_type"]

@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from "react"
-import { Button, Input, ScrollArea } from "./ui"
+import { Button, Input, ScrollArea, Textarea } from "./ui"
 import { cn } from "../lib/utils"
 import { useAuth } from "../contexts/AuthContext"
 import { hasRequiredRole } from "../auth/utils"
@@ -29,14 +29,57 @@ const TypingIndicator = () => (
   </div>
 )
 
-// Add FeedbackRequest component
-const FeedbackRequest: React.FC<{ onFeedback: (success: boolean) => void }> = ({ onFeedback }) => (
-  <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-    <span>Was this action successful?</span>
-    <button onClick={() => onFeedback(true)} className="hover:text-green-600">✅ Yes</button>
-    <button onClick={() => onFeedback(false)} className="hover:text-red-600">❌ No</button>
-  </div>
-)
+// Update FeedbackRequest component
+const FeedbackRequest: React.FC<{ onFeedback: (success: boolean, feedback_message?: string) => void }> = ({ onFeedback }) => {
+  const [showCommentBox, setShowCommentBox] = React.useState(false)
+  const [comment, setComment] = React.useState("")
+
+  const handleNo = () => {
+    setShowCommentBox(true)
+  }
+
+  const handleSubmitFeedback = () => {
+    onFeedback(false, comment)
+    setShowCommentBox(false)
+    setComment("")
+  }
+
+  if (showCommentBox) {
+    return (
+      <div className="flex flex-col gap-2 mt-2 text-sm">
+        <Textarea
+          placeholder="What went wrong? (optional)"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          className="min-h-[80px] text-sm"
+        />
+        <div className="flex gap-2">
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={() => setShowCommentBox(false)}
+          >
+            Cancel
+          </Button>
+          <Button 
+            size="sm" 
+            onClick={handleSubmitFeedback}
+          >
+            Submit Feedback
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+      <span>Was this action successful?</span>
+      <button onClick={() => onFeedback(true)} className="hover:text-green-600">✅ Yes</button>
+      <button onClick={handleNo} className="hover:text-red-600">❌ No</button>
+    </div>
+  )
+}
 
 export function ChatWindow({ className }: ChatWindowProps) {
   const { user, loading } = useAuth()
@@ -155,12 +198,12 @@ export function ChatWindow({ className }: ChatWindowProps) {
     }
   }
 
-  const handleFeedback = async (messageId: string, success: boolean) => {
+  const handleFeedback = async (messageId: string, success: boolean, feedback_message?: string) => {
     try {
       const response = await fetch(`/api/chat-messages/${messageId}/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ success })
+        body: JSON.stringify({ success, feedback_message })
       })
       
       if (!response.ok) throw new Error('Failed to save feedback')
@@ -249,7 +292,9 @@ export function ChatWindow({ className }: ChatWindowProps) {
                     {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                   {toolUsedMessages.has(message.id) && !message.success && (
-                    <FeedbackRequest onFeedback={(success) => handleFeedback(message.id, success)} />
+                    <FeedbackRequest onFeedback={(success, feedback_message) => 
+                      handleFeedback(message.id, success, feedback_message)
+                    } />
                   )}
                 </div>
               ))}

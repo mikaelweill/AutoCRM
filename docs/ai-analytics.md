@@ -1,139 +1,138 @@
-# AI Assistant Analytics Dashboard
+# AI Analytics Implementation
 
-## Overview
-A comprehensive analytics dashboard to monitor and improve the AI assistant's performance using both qualitative user feedback and quantitative LangChain metrics.
+## Database Structure
 
-## Data Sources
+```sql
+CREATE TABLE message_runs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    message_id UUID REFERENCES chat_messages(id) NOT NULL,
+    langsmith_run_id TEXT,
+    original_prompt TEXT,
+    
+    -- Commonly needed metrics from LangSmith
+    token_usage JSONB,  -- {prompt_tokens, completion_tokens, total_tokens}
+    latency INTEGER,    -- in milliseconds
+    
+    -- User feedback
+    success BOOLEAN,    -- NULL until user provides feedback
+    feedback_message TEXT,  -- Optional explanation if marked as failed
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
 
-### 1. User Feedback Data (Supabase)
-- Success/failure responses from agent interactions
-- Message content and context
-- Tool usage patterns
-- Timestamps and session data
+## Data Collection Strategy
 
-### 2. LangChain Metrics (LangSmith)
-- Response latency
-- Token usage
-- Tool invocation patterns
-- Trace data for debugging
-- Cost analysis
+### Core Fields (Initial Implementation)
+1. **message_id**
+   - Source: Created message ID from chat_messages table
+   - When: After inserting the assistant's response message
+   - In: `chat-messages/route.ts` POST endpoint
 
-## Dashboard Sections
+2. **langsmith_run_id**
+   - Source: `agentResponse.trace_id` from processMessage
+   - When: After agent processes the message
+   - In: `chat-messages/route.ts` POST endpoint
 
-### 1. High-Level Metrics
-- Overall success rate
-- Average response time
-- Active users/sessions
-- Total interactions
-- Cost per successful interaction
+3. **original_prompt**
+   - Source: User's input message (`content` from request body)
+   - When: When creating the message_run record
+   - In: `chat-messages/route.ts` POST endpoint
 
-### 2. Tool Usage Analysis
-- Success rate by tool type
-  * Ticket operations
-  * RAG queries
-  * Complex operations
-- Most used tools
-- Tool usage patterns
-- Average latency by tool type
+4. **actions**
+   - Source: TicketTool action logging in agent.ts
+   - Implementation: Add action logging array in TicketTool class
+   - Format: JSONB array of actions with timestamps
+   ```json
+   [
+     {
+       "type": "lookup",
+       "ticket_id": "123",
+       "timestamp": "2024-01-30T00:55:45.306Z",
+       "result": "success",
+       "details": "Found ticket #123"
+     }
+   ]
+   ```
 
-### 3. Temporal Analysis
-- Success rate over time
-  * Daily/Weekly/Monthly views
-  * Time-of-day patterns
-- Response time trends
-- Usage patterns
-- Improvement tracking
+5. **success & feedback_message**
+   - Source: User feedback through UI
+   - When: When user marks message as success/failure
+   - In: `chat-messages/route.ts` PATCH endpoint
+   - Initially: NULL until user provides feedback
 
-### 4. Failure Analysis
-- Common patterns in failed interactions
-- Tool-specific failure rates
-- User feedback categorization
-- Error type distribution
+## Implementation Steps
 
-### 5. Session Analysis
-- Success rate by session length
-- User learning curve
-- Session duration patterns
-- Multi-interaction patterns
+1. **Database Setup**
+   - Create the `message_runs` table
+   - Enable RLS
+   - Create admin view policy
+   - Create appropriate indexes
 
-### 6. Cost & Performance
-- Token usage metrics
-- Cost per interaction
-- Cost by tool type
-- Performance/cost ratio
+2. **Code Changes Required**
+   - Modify `processMessage` in `agent.ts`:
+     ```typescript
+     // Add to TicketTool class
+     private actionLog: {
+       type: string;
+       ticket_id: string;
+       timestamp: string;
+       result: string;
+       details: string;
+     }[] = [];
 
-## Implementation Plan
+     // Return in processMessage
+     return {
+       content: response,
+       trace_id: runId,
+       actions: ticketTool.getActionLog()
+     }
+     ```
+   
+   - Update `chat-messages/route.ts`:
+     ```typescript
+     // In POST endpoint
+     const { data: aiMessage } = await supabase
+       .from('chat_messages')
+       .insert({...})
+       .select()
+       .single()
 
-### Phase 1: Basic Metrics
-1. Set up basic dashboard layout
-2. Implement success/failure metrics
-3. Add basic temporal views
-4. Display tool usage statistics
+     // Create message_run record
+     await supabase
+       .from('message_runs')
+       .insert({
+         message_id: aiMessage.id,
+         langsmith_run_id: agentResponse.trace_id,
+         original_prompt: content,
+         actions: agentResponse.actions
+       })
 
-### Phase 2: Advanced Analytics
-1. Integrate LangSmith API
-2. Add detailed trace visualization
-3. Implement failure analysis
-4. Add cost tracking
+     // In PATCH endpoint
+     const { success, feedback_message } = await req.json()
+     await supabase
+       .from('message_runs')
+       .update({ 
+         success,
+         feedback_message,
+         updated_at: new Date().toISOString()
+       })
+       .eq('message_id', messageId)
+     ```
 
-### Phase 3: Optimization Tools
-1. Add filtering capabilities
-2. Implement pattern detection
-3. Add export functionality
-4. Create automated reports
+## Next Steps
 
-## Technical Requirements
+1. [ ] Create database table and policies
+2. [ ] Add action logging to TicketTool
+3. [ ] Update chat-messages POST endpoint
+4. [ ] Update chat-messages PATCH endpoint
+5. [ ] Test basic functionality
 
-### Frontend
-- Dashboard framework (e.g., Tremor)
-- Data visualization libraries
-- Real-time updates
-- Interactive filters
-
-### Backend
-- API endpoints for aggregated data
-- LangSmith API integration
-- Caching layer for performance
-- Data aggregation services
-
-### Database
-- New analytics tables if needed
-- Optimization for quick queries
-- Data retention policies
-- Backup strategies
-
-## Future Enhancements
-
-### 1. Predictive Analytics
-- Predict likely failures
-- Suggest optimization opportunities
-- Identify emerging patterns
-
-### 2. A/B Testing
-- Test different prompts
-- Compare tool configurations
-- Measure impact of changes
-
-### 3. Automated Optimization
-- Auto-adjust tool selection
-- Dynamic prompt enhancement
-- Resource optimization
-
-### 4. Custom Reports
-- Scheduled reports
-- Custom metrics
-- Stakeholder-specific views
-
-## Success Metrics
-
-### Primary KPIs
-- Improved success rate
-- Reduced response time
-- Lower cost per interaction
-- Higher user satisfaction
-
-### Secondary Metrics
-- Tool efficiency
-- Error reduction
-- Pattern identification
-- Resource optimization 
+## Analytics Features to Build
+- Success rate tracking
+- Token usage monitoring
+- Response time analysis
+- Cost estimation (based on token usage)
+- Failure analysis with user feedback 
