@@ -11,6 +11,7 @@ const adminNavLinks = [
   { href: '/admin-portal/ticket-assignment', label: 'Ticket Assignment' },
   { href: '/admin-portal/users', label: 'User Management' },
   { href: '/admin-portal/analytics', label: 'Analytics' },
+  { href: '/admin-portal/ai-analytics', label: 'AI Analytics' },
   { href: '/admin-portal/kb', label: 'Knowledge Base' }
 ]
 
