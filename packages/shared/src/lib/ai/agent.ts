@@ -451,9 +451,6 @@ interface FormattedStep {
   thought?: string;
 }
 
-// Use the existing AgentState interface from the top of the file
-const agentStates = new Map<string, AgentState>();
-
 // Create and export our agent setup function
 export async function createAssistantAgent(
   tracer: LangChainTracer,
@@ -572,12 +569,6 @@ class RunIDHandler extends BaseCallbackHandler {
   }
 }
 
-// Add this type to help with conversation history
-interface ConversationMessage {
-  role: 'human' | 'assistant'
-  content: string
-}
-
 // Modify the processMessage function to use proper message history
 export async function processMessage(content: string, agentId: string): Promise<AgentResponse> {
   try {
@@ -589,44 +580,15 @@ export async function processMessage(content: string, agentId: string): Promise<
       projectName: process.env.LANGCHAIN_PROJECT || "autocrm"
     })
 
-    // Get or initialize conversation history
-    if (!agentStates.has(agentId)) {
-      const initialState: AgentState = {
-        chatHistory: [],
-        currentSteps: [],
-        conversationContext: {} as Record<string, unknown>
-      };
-      agentStates.set(agentId, initialState);
-    }
-    const agentState = agentStates.get(agentId)!;
-
     const agent = await createAssistantAgent(tracer, agentId, runId)
     
     console.log('Invoking agent with content:', content)
     
-    // Convert conversation history to LangChain messages
-    const chatHistory = agentState.chatHistory.map(msg => 
-      msg.role === 'human' 
-        ? new HumanMessage(msg.content)
-        : new AIMessage(msg.content)
-    );
-
-    // Execute agent with chat history
+    // Execute agent with empty chat history
     const result = await agent.invoke({ 
       input: content,
-      chat_history: chatHistory
+      chat_history: []
     })
-
-    // Update conversation history
-    agentState.chatHistory.push(
-      { role: 'human', content },
-      { role: 'assistant', content: result.output || '' }
-    );
-
-    // Keep only last 20 messages
-    if (agentState.chatHistory.length > 20) {
-      agentState.chatHistory = agentState.chatHistory.slice(-20);
-    }
 
     // Log the complete interaction
     console.log('Agent result:', result)
