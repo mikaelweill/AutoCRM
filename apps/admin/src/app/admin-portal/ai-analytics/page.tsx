@@ -146,7 +146,12 @@ export default function AIAnalyticsPage() {
     // Calculate performance metrics
     const metrics = {
       totalRuns: allRuns.length,
-      successRate: (allRuns.filter(run => run.success === true).length / allRuns.length) * 100,
+      successRate: (() => {
+        const completedRuns = allRuns.filter(run => run.success !== null);
+        return completedRuns.length > 0 
+          ? (completedRuns.filter(run => run.success === true).length / completedRuns.length) * 100 
+          : 0;
+      })(),
       averageLatency: allRuns.filter(run => run.latency !== null)
         .reduce((acc, run) => acc + (run.latency || 0), 0) / allRuns.filter(run => run.latency !== null).length || 0,
       averageDuration: allRuns.filter(run => run.duration_ms !== null)
@@ -201,9 +206,12 @@ export default function AIAnalyticsPage() {
       return {
         date,
         runs: dayRuns.length,
-        successRate: dayRuns.length > 0
-          ? (dayRuns.filter(run => run.success === true).length / dayRuns.length) * 100
-          : 0
+        successRate: (() => {
+          const completedRuns = dayRuns.filter(run => run.success !== null);
+          return completedRuns.length > 0
+            ? (completedRuns.filter(run => run.success === true).length / completedRuns.length) * 100
+            : 0;
+        })()
       }
     })
   }
