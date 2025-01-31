@@ -89,7 +89,30 @@ export default function AIAnalyticsPage() {
 
   useEffect(() => {
     fetchAnalytics()
-  }, [currentPage])
+
+    // Set up real-time subscription
+    const supabase = createClient()
+    const subscription = supabase
+      .channel('message_runs_changes')
+      .on('postgres_changes', 
+        {
+          event: '*', // Listen to all events (insert, update, delete)
+          schema: 'public',
+          table: 'message_runs'
+        }, 
+        (payload) => {
+          console.log('Real-time update:', payload);
+          // Refresh data when changes occur
+          fetchAnalytics();
+        }
+      )
+      .subscribe()
+
+    // Cleanup subscription on unmount
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [currentPage]) // Keep currentPage in dependencies
 
   async function fetchAnalytics() {
     const supabase = createClient()
@@ -124,8 +147,10 @@ export default function AIAnalyticsPage() {
     const metrics = {
       totalRuns: allRuns.length,
       successRate: (allRuns.filter(run => run.success === true).length / allRuns.length) * 100,
-      averageLatency: allRuns.reduce((acc, run) => acc + (run.latency || 0), 0) / allRuns.length,
-      averageDuration: allRuns.reduce((acc, run) => acc + (run.duration_ms || 0), 0) / allRuns.length,
+      averageLatency: allRuns.filter(run => run.latency !== null)
+        .reduce((acc, run) => acc + (run.latency || 0), 0) / allRuns.filter(run => run.latency !== null).length || 0,
+      averageDuration: allRuns.filter(run => run.duration_ms !== null)
+        .reduce((acc, run) => acc + (run.duration_ms || 0), 0) / allRuns.filter(run => run.duration_ms !== null).length || 0,
       totalCost: allRuns.reduce((acc, run) => acc + (run.cost || 0), 0),
       totalTokens: allRuns.reduce((acc, run) => acc + (run.total_tokens || 0), 0),
       errorRate: (allRuns.filter(run => run.error_type !== null).length / allRuns.length) * 100
@@ -344,13 +369,13 @@ export default function AIAnalyticsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        run.success 
+                        run.success === true
                           ? 'bg-green-100 text-green-800'
                           : run.success === false
                           ? 'bg-red-100 text-red-800'
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
-                        {run.status || (run.success ? 'Success' : 'Failed')}
+                        {run.success === true ? 'Success' : run.success === false ? 'Failed' : 'Pending'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

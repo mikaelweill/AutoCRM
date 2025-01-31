@@ -211,8 +211,7 @@ export async function POST(req: Request) {
                         total_tokens: run.total_tokens || 0
                       },
                       cost: run.total_cost || 0,
-                      latency: run.end_time && run.first_token_time ? 
-                        new Date(run.end_time).getTime() - new Date(run.first_token_time).getTime() : null
+                      latency: run.latency || null
                     })
 
                     // Update message_run with complete LangSmith data
@@ -229,8 +228,7 @@ export async function POST(req: Request) {
                         end_time: run.end_time ? new Date(run.end_time).toISOString() : null,
                         duration_ms: run.end_time && run.start_time ? 
                           new Date(run.end_time).getTime() - new Date(run.start_time).getTime() : null,
-                        latency: run.end_time && run.first_token_time ? 
-                          new Date(run.end_time).getTime() - new Date(run.first_token_time).getTime() : null,
+                        latency: run.latency || null,
 
                         // Token and cost info
                         total_tokens: run.total_tokens || null,
